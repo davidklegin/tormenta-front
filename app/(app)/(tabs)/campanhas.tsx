@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { RefreshControl, View } from 'react-native';
 import { router } from 'expo-router';
 import { ApiError } from '@/api';
+import type { Campaign } from '@/api/types';
 import {
   Button,
   Card,
@@ -11,20 +12,40 @@ import {
   Input,
   Loading,
   Screen,
+  SegmentedControl,
   Sheet,
   Text,
 } from '@/components/ui';
 import { PageHeader, ResponsiveGrid } from '@/components/layout';
-import { useCampaigns, useCreateCampaign, useJoinCampaign } from '@/hooks/useCampaigns';
+import {
+  useCampaigns,
+  useCreateCampaign,
+  useJoinCampaign,
+  useJoinPublicCampaign,
+  usePublicCampaigns,
+} from '@/hooks/useCampaigns';
 import { spacing, useTheme } from '@/theme';
 
-/** Campanhas do jogador — como jogador e como mestre (briefing §16). */
+type Aba = 'minhas' | 'explorar';
+
+/**
+ * Campanhas: as minhas e as de todo mundo (briefing §16).
+ *
+ * As mesas são públicas por padrão, então a tela tem duas listas. "Minhas" é
+ * onde se joga; "Explorar" é o catálogo aberto, de onde se entra numa mesa com
+ * um toque, sem depender de o mestre passar código.
+ */
 export default function CampaignsScreen() {
   const { colors } = useTheme();
 
+  const [aba, setAba] = useState<Aba>('minhas');
+  const [busca, setBusca] = useState('');
+
   const campaigns = useCampaigns();
+  const catalogo = usePublicCampaigns(aba === 'explorar' ? busca.trim() : '');
   const createCampaign = useCreateCampaign();
   const joinCampaign = useJoinCampaign();
+  const joinPublic = useJoinPublicCampaign();
 
   const [createOpen, setCreateOpen] = useState(false);
   const [joinOpen, setJoinOpen] = useState(false);
@@ -32,6 +53,8 @@ export default function CampaignsScreen() {
   const [description, setDescription] = useState('');
   const [code, setCode] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
+
+  const lista = aba === 'minhas' ? campaigns : catalogo;
 
   async function handleCreate() {
     if (name.trim().length < 2) {
@@ -77,30 +100,20 @@ export default function CampaignsScreen() {
     }
   }
 
-  if (campaigns.isLoading) {
-    return (
-      <Screen insideTabs>
-        <Loading label="Carregando campanhas…" />
-      </Screen>
-    );
-  }
-
-  const list = campaigns.data ?? [];
-
   return (
     <Screen
       insideTabs
       refreshControl={
         <RefreshControl
-          refreshing={campaigns.isRefetching}
-          onRefresh={() => void campaigns.refetch()}
+          refreshing={lista.isRefetching}
+          onRefresh={() => void lista.refetch()}
           tintColor={colors.primary}
         />
       }
     >
       <PageHeader
         title="Campanhas"
-        subtitle="Mesas das quais você participa"
+        subtitle={aba === 'minhas' ? 'Mesas das quais você participa' : 'Mesas abertas de toda a comunidade'}
         actions={
           <>
             <Button
@@ -114,61 +127,52 @@ export default function CampaignsScreen() {
         }
       />
 
-      {campaigns.isError ? (
-        <ErrorState error={campaigns.error} onRetry={() => void campaigns.refetch()} />
+      <SegmentedControl
+        value={aba}
+        onChange={setAba}
+        segments={[
+          { value: 'minhas', label: 'Minhas', badge: campaigns.data?.length || undefined },
+          { value: 'explorar', label: 'Explorar' },
+        ]}
+      />
+
+      {aba === 'explorar' ? (
+        <Input
+          placeholder="Buscar mesa pelo nome…"
+          value={busca}
+          onChangeText={setBusca}
+          autoCorrect={false}
+        />
       ) : null}
 
-      {list.length === 0 ? (
-        <EmptyState
-          icon="campanhas"
-          title="Nenhuma campanha ainda"
-          description="Crie uma mesa para mestrar ou entre em uma com o código que o mestre te passou."
-          actionLabel="Criar campanha"
-          onAction={() => setCreateOpen(true)}
-        />
+      {lista.isError ? <ErrorState error={lista.error} onRetry={() => void lista.refetch()} /> : null}
+
+      {lista.isLoading ? (
+        <Loading label={aba === 'minhas' ? 'Carregando campanhas…' : 'Procurando mesas…'} />
+      ) : (lista.data ?? []).length === 0 ? (
+        <ListaVazia aba={aba} busca={busca} onCriar={() => setCreateOpen(true)} onExplorar={() => setAba('explorar')} />
       ) : (
         <ResponsiveGrid columns={{ phone: 1, tablet: 2, desktop: 3 }}>
-          {list.map((campaign) => (
-            <Card
+          {(lista.data ?? []).map((campaign) => (
+            <CampanhaCard
               key={campaign.id}
-              accentColor={campaign.is_master ? colors.accentInk : undefined}
-              onPress={() => router.push(`/(app)/campanhas/${campaign.id}`)}
-            >
-              <View style={{ gap: spacing.sm }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                  <Text variant="heading" numberOfLines={1} style={{ flex: 1 }}>
-                    {campaign.name}
-                  </Text>
-                  <Chip
-                    label={campaign.is_master ? 'Mestre' : 'Jogador'}
-                    tone={campaign.is_master ? 'gold' : 'neutral'}
-                    compact
-                  />
-                </View>
-
-                {campaign.description ? (
-                  <Text variant="small" tone="secondary" numberOfLines={2}>
-                    {campaign.description}
-                  </Text>
-                ) : null}
-
-                <Text variant="small" tone="muted">
-                  {campaign.characters_count ?? 0} personagem(ns) · {campaign.members_count ?? 0} membro(s)
-                </Text>
-
-                {campaign.is_master ? (
-                  <Button
-                    label="Painel do Mestre"
-                    variant="gold"
-                    size="sm"
-                    onPress={() => router.push(`/(app)/campanhas/${campaign.id}/painel`)}
-                  />
-                ) : null}
-              </View>
-            </Card>
+              campaign={campaign}
+              entrando={joinPublic.isPending && joinPublic.variables === campaign.id}
+              onEntrar={() => {
+                joinPublic.mutate(campaign.id, {
+                  onSuccess: () => router.push(`/(app)/campanhas/${campaign.id}`),
+                });
+              }}
+            />
           ))}
         </ResponsiveGrid>
       )}
+
+      {aba === 'explorar' && (catalogo.data ?? []).length > 0 ? (
+        <Text variant="caption" tone="muted">
+          O catálogo mostra as mesas com movimento mais recente. Para achar outra, busque pelo nome.
+        </Text>
+      ) : null}
 
       <Sheet
         visible={createOpen}
@@ -200,6 +204,10 @@ export default function CampaignsScreen() {
           multiline
           placeholder="Do que se trata a campanha?"
         />
+        <Text variant="small" tone="muted">
+          A mesa nasce pública: aparece em Explorar e qualquer jogador pode entrar. Você fecha quando
+          quiser, na tela da campanha.
+        </Text>
         {formError ? (
           <Text variant="small" tone="danger">
             {formError}
@@ -233,6 +241,9 @@ export default function CampaignsScreen() {
           maxLength={8}
           placeholder="ABCD1234"
         />
+        <Text variant="small" tone="muted">
+          O código é o caminho para as mesas fechadas. As públicas você acha em Explorar.
+        </Text>
         {formError ? (
           <Text variant="small" tone="danger">
             {formError}
@@ -240,5 +251,107 @@ export default function CampaignsScreen() {
         ) : null}
       </Sheet>
     </Screen>
+  );
+}
+
+/**
+ * Card de campanha nas duas listas.
+ *
+ * O que muda entre elas é o rodapé: na minha mesa, o atalho do Painel do
+ * Mestre; no catálogo, o botão de entrar — ou a marca de que já participo.
+ */
+function CampanhaCard({
+  campaign,
+  entrando,
+  onEntrar,
+}: {
+  campaign: Campaign;
+  entrando: boolean;
+  onEntrar: () => void;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <Card
+      accentColor={campaign.is_master ? colors.accentInk : undefined}
+      onPress={() => router.push(`/(app)/campanhas/${campaign.id}`)}
+    >
+      <View style={{ gap: spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Text variant="heading" numberOfLines={1} style={{ flex: 1 }}>
+            {campaign.name}
+          </Text>
+          {campaign.is_member ? (
+            <Chip
+              label={campaign.is_master ? 'Mestre' : 'Jogador'}
+              tone={campaign.is_master ? 'gold' : 'neutral'}
+              compact
+            />
+          ) : (
+            <Chip label="Aberta" tone="neutral" compact />
+          )}
+        </View>
+
+        {campaign.description ? (
+          <Text variant="small" tone="secondary" numberOfLines={2}>
+            {campaign.description}
+          </Text>
+        ) : null}
+
+        <Text variant="small" tone="muted">
+          {campaign.master?.name ? `Mestre: ${campaign.master.name} · ` : ''}
+          {campaign.characters_count ?? 0} personagem(ns) · {campaign.members_count ?? 0} membro(s)
+        </Text>
+
+        {campaign.is_master ? (
+          <Button
+            label="Painel do Mestre"
+            variant="gold"
+            size="sm"
+            onPress={() => router.push(`/(app)/campanhas/${campaign.id}/painel`)}
+          />
+        ) : campaign.can_join ? (
+          <Button label="Participar" variant="secondary" size="sm" onPress={onEntrar} loading={entrando} />
+        ) : null}
+      </View>
+    </Card>
+  );
+}
+
+function ListaVazia({
+  aba,
+  busca,
+  onCriar,
+  onExplorar,
+}: {
+  aba: Aba;
+  busca: string;
+  onCriar: () => void;
+  onExplorar: () => void;
+}) {
+  if (aba === 'explorar') {
+    return (
+      <EmptyState
+        icon="campanhas"
+        title={busca.trim() ? 'Nenhuma mesa com esse nome' : 'Nenhuma mesa aberta ainda'}
+        description={
+          busca.trim()
+            ? 'Tente outro termo — a busca procura no nome e na descrição da campanha.'
+            : 'Crie a primeira mesa pública e ela aparecerá aqui para todo mundo.'
+        }
+        actionLabel="Criar campanha"
+        onAction={onCriar}
+      />
+    );
+  }
+
+  return (
+    <EmptyState
+      icon="campanhas"
+      title="Nenhuma campanha ainda"
+      description="Crie uma mesa para mestrar ou entre em uma das mesas abertas da comunidade."
+      actionLabel="Explorar mesas"
+      onAction={onExplorar}
+    />
   );
 }

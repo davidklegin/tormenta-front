@@ -31,6 +31,11 @@ export type AuthResponse = { token: string; user: User };
 
 // -------------------------------------------------------------- campanhas
 
+export type CampaignVisibility = 'public' | 'private';
+
+/** Qual lista de campanhas pedir: as minhas, o catálogo aberto, ou as duas. */
+export type CampaignScope = 'mine' | 'public' | 'all';
+
 export type Campaign = {
   id: number;
   name: string;
@@ -38,11 +43,17 @@ export type Campaign = {
   cover_url: string | null;
   status: 'active' | 'paused' | 'archived';
   status_label: string;
+  /** Pública: qualquer usuário acha a mesa no catálogo, lê e entra sem código. */
+  visibility: CampaignVisibility;
+  visibility_label: string;
   invite_code?: string;
   settings?: Record<string, unknown> | null;
   master?: User;
   my_role: CampaignRole | null;
   is_master: boolean;
+  is_member: boolean;
+  /** Mesa pública da qual ainda não participo — vale o botão "Participar". */
+  can_join: boolean;
   members?: CampaignMember[];
   members_count?: number;
   characters_count?: number;

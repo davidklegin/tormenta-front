@@ -51,10 +51,13 @@ export default function CampaignNotesScreen() {
 
   const { remove } = useCampaignNoteMutations(campaignId);
 
-  // Notas criadas ou editadas por outros membros chegam sem recarregar a tela.
-  useCampaignChannel(campaignId, true);
-
   const isMaster = campaign.data?.is_master ?? false;
+  // Visitante de mesa pública lê as anotações, mas não escreve nelas nem
+  // assina o canal da sessão — o servidor recusaria os dois.
+  const isMember = campaign.data?.is_member ?? false;
+
+  // Notas criadas ou editadas por outros membros chegam sem recarregar a tela.
+  useCampaignChannel(campaignId, isMember);
 
   return (
     <Screen>
@@ -63,14 +66,16 @@ export default function CampaignNotesScreen() {
         subtitle={campaign.data?.name}
         back
         actions={
-          <Button
-            label="Nova anotação"
-            size="sm"
-            onPress={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
-          />
+          isMember ? (
+            <Button
+              label="Nova anotação"
+              size="sm"
+              onPress={() => {
+                setEditing(null);
+                setFormOpen(true);
+              }}
+            />
+          ) : undefined
         }
       />
 
@@ -92,12 +97,20 @@ export default function CampaignNotesScreen() {
         <EmptyState
           icon="anotacoes"
           title="Nenhuma anotação"
-          description="Registre NPCs, lugares, missões e pistas para toda a mesa consultar."
-          actionLabel="Criar a primeira"
-          onAction={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
+          description={
+            isMember
+              ? 'Registre NPCs, lugares, missões e pistas para toda a mesa consultar.'
+              : 'Esta mesa ainda não publicou anotações. Participe da campanha para escrever nela.'
+          }
+          actionLabel={isMember ? 'Criar a primeira' : undefined}
+          onAction={
+            isMember
+              ? () => {
+                  setEditing(null);
+                  setFormOpen(true);
+                }
+              : undefined
+          }
         />
       ) : (
         <View style={{ gap: spacing.sm }}>

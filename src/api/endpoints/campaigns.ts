@@ -1,6 +1,7 @@
 import { apiRequest, apiUpload } from '../client';
 import type {
   Campaign,
+  CampaignScope,
   CampaignMember,
   CampaignNote,
   CampaignNoteImage,
@@ -12,7 +13,12 @@ import type {
 } from '../types';
 
 export const campaignsApi = {
-  list: () => apiRequest<Envelope<Campaign[]>>('/campaigns').then((r) => r.data),
+  /**
+   * `scope` escolhe a lista: 'mine' (padrão) são as mesas das quais participo,
+   * 'public' é o catálogo aberto e 'all' junta os dois. `q` busca no catálogo.
+   */
+  list: (params?: { scope?: CampaignScope; q?: string }) =>
+    apiRequest<Envelope<Campaign[]>>('/campaigns', { query: params }).then((r) => r.data),
 
   get: (id: number) => apiRequest<Envelope<Campaign>>(`/campaigns/${id}`).then((r) => r.data),
 
@@ -35,6 +41,10 @@ export const campaignsApi = {
       method: 'POST',
       body: { code },
     }),
+
+  /** Entrada livre numa mesa pública — sem código. */
+  joinPublic: (id: number) =>
+    apiRequest<{ message: string; campaign: Campaign }>(`/campaigns/${id}/join`, { method: 'POST' }),
 
   leave: (id: number) => apiRequest<{ message: string }>(`/campaigns/${id}/leave`, { method: 'POST' }),
 

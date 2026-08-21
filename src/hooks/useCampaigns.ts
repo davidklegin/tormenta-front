@@ -5,6 +5,7 @@ import { useSessionStore } from '@/store/session';
 
 export const campaignKeys = {
   all: ['campaigns'] as const,
+  catalog: (q: string) => ['campaigns', 'public', q] as const,
   detail: (id: number) => ['campaign', id] as const,
   dashboard: (id: number) => ['dashboard', id] as const,
   members: (id: number) => ['campaign-members', id] as const,
@@ -12,11 +13,26 @@ export const campaignKeys = {
   characters: (id: number) => ['campaign-characters', id] as const,
 };
 
+/** As mesas das quais o usuário participa — o que a aba Campanhas abre. */
 export function useCampaigns() {
   return useQuery<Campaign[]>({
     queryKey: campaignKeys.all,
-    queryFn: campaignsApi.list,
+    queryFn: () => campaignsApi.list(),
     staleTime: 1000 * 60,
+  });
+}
+
+/**
+ * O catálogo aberto: mesas públicas de todo mundo.
+ *
+ * A busca vai ao servidor porque o catálogo devolve as mais recentes, e não a
+ * base inteira — é assim que se acha uma campanha antiga.
+ */
+export function usePublicCampaigns(q = '') {
+  return useQuery<Campaign[]>({
+    queryKey: campaignKeys.catalog(q),
+    queryFn: () => campaignsApi.list({ scope: 'public', q: q || undefined }),
+    staleTime: 1000 * 30,
   });
 }
 
@@ -83,6 +99,32 @@ export function useCreateCampaign() {
   return useMutation({
     mutationFn: (payload: { name: string; description?: string }) => campaignsApi.create(payload),
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: campaignKeys.all });
+    },
+  });
+}
+
+/** Entrada livre numa mesa pública, sem código de convite. */
+export function useJoinPublicCampaign() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => campaignsApi.joinPublic(id),
+    onSuccess: (_result, id) => {
+      void queryClient.invalidateQueries({ queryKey: campaignKeys.all });
+      void queryClient.invalidateQueries({ queryKey: campaignKeys.detail(id) });
+    },
+  });
+}
+
+/** Edição da campanha pelo mestre — nome, descrição, visibilidade. */
+export function useUpdateCampaign(id: number) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: Record<string, unknown>) => campaignsApi.update(id, payload),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: campaignKeys.detail(id) });
       void queryClient.invalidateQueries({ queryKey: campaignKeys.all });
     },
   });

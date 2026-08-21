@@ -15,6 +15,7 @@ import {
   Input,
   Loading,
   Screen,
+  SegmentedControl,
   Sheet,
   Text,
 } from '@/components/ui';
@@ -25,10 +26,18 @@ import {
   useCampaignCharacters,
   useCampaignMembers,
   useCampaignNotes,
+  useJoinPublicCampaign,
+  useUpdateCampaign,
 } from '@/hooks/useCampaigns';
 import { radius, spacing, useTheme } from '@/theme';
 
-/** Tela da campanha: membros, personagens e atalhos (briefing §16 e §17). */
+/**
+ * Tela da campanha: membros, personagens e atalhos (briefing §16 e §17).
+ *
+ * A mesma tela serve a três olhares — o mestre, o jogador da mesa e o
+ * visitante que chegou pelo catálogo. O visitante lê tudo o que é público e
+ * tem um único botão a mais: participar.
+ */
 export default function CampaignScreen() {
   const { colors } = useTheme();
 
@@ -76,6 +85,9 @@ export default function CampaignScreen() {
     },
   });
 
+  const joinPublic = useJoinPublicCampaign();
+  const updateCampaign = useUpdateCampaign(campaignId);
+
   if (campaign.isLoading) {
     return (
       <Screen>
@@ -115,9 +127,48 @@ export default function CampaignScreen() {
         }
       />
 
+      {/* Visitante do catálogo: lê a mesa inteira, e entra com um toque. */}
+      {data.can_join ? (
+        <Card title="Mesa aberta" subtitle="Você está visitando esta campanha">
+          <View style={{ gap: spacing.md }}>
+            <Text variant="small" tone="secondary">
+              Qualquer jogador pode entrar nesta mesa. Participando, você vincula seus personagens,
+              escreve nas anotações e acompanha a sessão ao vivo.
+            </Text>
+            <Button
+              label="Participar da campanha"
+              onPress={() => joinPublic.mutate(campaignId)}
+              loading={joinPublic.isPending}
+              fullWidth
+            />
+          </View>
+        </Card>
+      ) : null}
+
       {/* Anotações em destaque: é o que a mesa mais consulta entre as sessões,
           então mostra o conteúdo, e não só um botão para outro lugar. */}
       <NotasDaCampanha campaignId={campaignId} notas={notes.data?.data ?? []} carregando={notes.isLoading} />
+
+      {/* Visibilidade: quem decide se a mesa fica no catálogo é o mestre */}
+      {isMaster ? (
+        <Card title="Visibilidade" subtitle="Quem enxerga esta campanha">
+          <View style={{ gap: spacing.md }}>
+            <SegmentedControl
+              value={data.visibility}
+              onChange={(visibility) => updateCampaign.mutate({ visibility })}
+              segments={[
+                { value: 'public', label: 'Pública' },
+                { value: 'private', label: 'Privada' },
+              ]}
+            />
+            <Text variant="caption" tone="muted">
+              {data.visibility === 'public'
+                ? 'A mesa aparece em Explorar e qualquer jogador pode entrar sem código. O Painel do Mestre e as anotações marcadas "somente o mestre" continuam só seus.'
+                : 'Só os membros veem esta campanha. Para entrar, é preciso o código de convite.'}
+            </Text>
+          </View>
+        </Card>
+      ) : null}
 
       {/* Código de convite: só o mestre vê */}
       {isMaster && data.invite_code ? (
