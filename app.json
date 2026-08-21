@@ -1,25 +1,73 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
-    "version": "1.0.0",
-    "orientation": "portrait",
+    "name": "Tormenta20",
+    "slug": "tormenta20",
+    "version": "1.2.0",
+    "orientation": "default",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "scheme": "tormenta20",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#12100F"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tormenta20.app"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "monochromeImage": "./assets/android-icon-monochrome.png",
+        "backgroundColor": "#12100F"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.tormenta20.app",
+      "usesCleartextTraffic": true,
+      "versionCode": 3
     },
     "web": {
+      "bundler": "metro",
+      "output": "single",
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O aplicativo usa suas fotos para definir o avatar do personagem."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "baseUrl": "/web"
+    },
+    "extra": {
+      "apiUrl": "https://supercivilly-unsloughing-kandis.ngrok-free.dev",
+      "reverb": {
+        "key": "9d5a352bff391440eccc",
+        "host": "supercivilly-unsloughing-kandis.ngrok-free.dev",
+        "port": 443,
+        "scheme": "https"
+      }
     }
   }
 }

@@ -1,0 +1,556 @@
+/*
+ * Ornamentos — a camada decorativa da versão web.
+ *
+ * Cada ornamento responde a duas formas: a classe (`.t20-corners`), para markup
+ * escrito à mão, e o atributo equivalente (`[data-t20~='corners']`), que é o que
+ * o React Native Web consegue emitir — ele não repassa `className`, mas repassa
+ * `dataSet`. Ver `ornamentAttrs()` em src/theme/ornaments.ts.
+ *
+ * O aplicativo é React Native, então quase toda a interface é desenhada por
+ * componentes que valem nas três plataformas. Sobram, porém, efeitos que só
+ * existem no navegador: pseudo-elementos, barra de rolagem, `:focus-visible`,
+ * desfoque de fundo e o grão ladrilhado sobre a página inteira. É isso que mora
+ * aqui, e nada além — se um ornamento pode ser feito em componente, ele foi.
+ *
+ * Todas as cores vêm de theme.css. Nenhum valor literal.
+ *
+ * Regras que valem para o arquivo inteiro:
+ *   · anima-se transform e opacity, nunca propriedade que provoque reflow;
+ *   · decoração é aria-hidden e pointer-events: none;
+ *   · com prefers-reduced-motion o efeito assume o estado final e para.
+ */
+
+/* ------------------------------------------------------------------ *
+ * Base da página
+ * ------------------------------------------------------------------ */
+
+html {
+  background-color: var(--bg);
+  color: var(--text);
+  /*
+   * Item 18 — transição de tema. Só background-color e color, e só na raiz:
+   * transicionar borda e sombra de cada elemento deixaria a troca arrastada e
+   * daria a impressão de que a página está lenta, não de que mudou de tema.
+   */
+  transition:
+    background-color var(--dur-base) var(--ease-standard),
+    color var(--dur-base) var(--ease-standard);
+}
+
+body {
+  background-color: var(--bg);
+  font-family: var(--font-ui);
+}
+
+/*
+ * Item 16 — grão de papel.
+ *
+ * Camada fixa sobre o fundo, atrás de tudo. `position: fixed` mantém o grão
+ * parado enquanto a página rola: papel não desliza junto com a tinta. A 4% de
+ * opacidade, ele tira a chapa lisa do fundo sem chegar a competir com o texto.
+ */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: var(--grain);
+  background-repeat: repeat;
+  opacity: var(--grain-opacity);
+}
+
+/*
+ * Item 15 — atmosfera.
+ *
+ * No escuro, um halo rubi no alto da página: a Tormenta no horizonte. No claro,
+ * uma vinheta sépia nas bordas, que é o que o papel velho faz sozinho. Fixa,
+ * atrás do conteúdo, sem participar da rolagem.
+ */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image: radial-gradient(120% 100% at 50% 50%, transparent 45%, var(--overlay) 100%);
+  opacity: 0.18;
+}
+
+[data-theme='dark'] body::after {
+  background-image: radial-gradient(120% 55% at 50% 0%, var(--glow) 0%, transparent 62%);
+  /* 0.18 sobre um rubi a 35% de alfa dá os 6% do briefing. */
+  opacity: 0.18;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) body::after {
+    background-image: radial-gradient(120% 55% at 50% 0%, var(--glow) 0%, transparent 62%);
+    opacity: 0.18;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Item 19 — foco
+ * ------------------------------------------------------------------ */
+
+/*
+ * Anel dourado em tudo que recebe foco pelo teclado, inclusive nos elementos
+ * que o React Native Web produz (divs com tabindex, que nenhum seletor de tag
+ * alcançaria). `:focus-visible` mantém o anel fora do caminho de quem usa
+ * ponteiro, e o `offset` impede que ele se confunda com a borda do controle.
+ */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible,
+:where([role='button'], [role='tab'], [role='switch'], [role='link']):focus-visible {
+  outline: var(--stroke-seal) solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Sem o anel padrão do navegador competindo com o do tema. */
+:where(a, button, input, select, textarea, [tabindex]):focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ------------------------------------------------------------------ *
+ * Item 8 — barra de rolagem
+ * ------------------------------------------------------------------ */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--accent-soft) var(--surface-alt);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface-alt);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-soft);
+  border-radius: var(--radius-none);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--surface-alt);
+}
+
+/* ------------------------------------------------------------------ *
+ * Item 1 — capitular
+ * ------------------------------------------------------------------ */
+
+/*
+ * Classe utilitária, e não seletor global: capitular em toda primeira letra da
+ * página transformaria rótulo de campo e item de lista em abertura de capítulo.
+ * Quem decide é quem escreve o texto longo.
+ */
+.t20-dropcap::first-letter,
+[data-t20~='dropcap']::first-letter {
+  float: left;
+  font-family: var(--font-display);
+  font-size: calc(var(--text-md) * var(--leading-body) * 3);
+  line-height: 0.82;
+  color: var(--primary-ink);
+  padding-right: var(--space-2);
+  padding-bottom: var(--space-1);
+  margin-top: var(--space-1);
+  border-bottom: var(--stroke-hairline) solid var(--accent);
+}
+
+/* ------------------------------------------------------------------ *
+ * Item 3 — cantoneiras de card
+ * ------------------------------------------------------------------ */
+
+/*
+ * Quatro Ls de 12px feitos com dois pseudo-elementos: cada um desenha dois
+ * cantos opostos usando as quatro bordas de uma caixa vazia. Nenhum markup
+ * extra, e a transição é só de `width`/`height` de um elemento absoluto — que
+ * não participa do fluxo, então não há reflow do conteúdo.
+ */
+.t20-corners,
+[data-t20~='corners'] {
+  position: relative;
+}
+
+.t20-corners::before,
+[data-t20~='corners']::before,
+.t20-corners::after,
+[data-t20~='corners']::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border: 0 solid var(--border);
+  pointer-events: none;
+  transition:
+    width var(--dur-fast) var(--ease-standard),
+    height var(--dur-fast) var(--ease-standard),
+    border-color var(--dur-fast) var(--ease-standard);
+}
+
+.t20-corners::before,
+[data-t20~='corners']::before {
+  top: 0;
+  left: 0;
+  border-top-width: var(--stroke-hairline);
+  border-left-width: var(--stroke-hairline);
+}
+
+.t20-corners::after,
+[data-t20~='corners']::after {
+  bottom: 0;
+  right: 0;
+  border-bottom-width: var(--stroke-hairline);
+  border-right-width: var(--stroke-hairline);
+}
+
+.t20-corners:hover::before,
+[data-t20~='corners']:hover::before,
+.t20-corners:hover::after,
+[data-t20~='corners']:hover::after,
+.t20-corners:focus-within::before,
+[data-t20~='corners']:focus-within::before,
+.t20-corners:focus-within::after,
+[data-t20~='corners']:focus-within::after {
+  width: 16px;
+  height: 16px;
+  border-color: var(--accent);
+}
+
+/* ------------------------------------------------------------------ *
+ * Item 4 — fio de rubi
+ * ------------------------------------------------------------------ */
+
+.t20-ruby-thread,
+[data-t20~='ruby-thread'] {
+  position: relative;
+}
+
+.t20-ruby-thread::before,
+[data-t20~='ruby-thread']::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--stroke-seal);
+  pointer-events: none;
+  background-image: linear-gradient(90deg, transparent 0%, var(--primary) 50%, transparent 100%);
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.t20-ruby-thread.is-active::before,
+[data-t20~='ruby-thread'].is-active::before {
+  animation: t20-thread var(--dur-base) var(--ease-decelerate) forwards;
+}
+
+@keyframes t20-thread {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Item 6 — brilho do botão primário
+ * ------------------------------------------------------------------ */
+
+/*
+ * O brilho cruza o botão uma vez por hover — `animation` disparada na entrada,
+ * sem `infinite`. Um botão que pisca sozinho para sempre vira alarme.
+ */
+.t20-sheen,
+[data-t20~='sheen'] {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.t20-sheen::after,
+[data-t20~='sheen']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--accent-soft) 55%, transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  opacity: 0;
+}
+
+.t20-sheen:hover::after,
+[data-t20~='sheen']:hover::after,
+.t20-sheen:focus-visible::after,
+[data-t20~='sheen']:focus-visible::after {
+  animation: t20-sheen var(--dur-slow) var(--ease-standard) 1;
+}
+
+@keyframes t20-sheen {
+  from {
+    transform: translateX(-120%);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Item 13 — brilho do esqueleto de carregamento
+ * ------------------------------------------------------------------ */
+
+.t20-skeleton,
+[data-t20~='skeleton'] {
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-alt);
+  border-radius: var(--radius-sm);
+}
+
+.t20-skeleton::after,
+[data-t20~='skeleton']::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.08;
+  background-image: linear-gradient(90deg, transparent 0%, var(--accent-soft) 50%, transparent 100%);
+  animation: t20-shimmer 1400ms linear infinite;
+}
+
+@keyframes t20-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Itens 9, 10 e 12 — dica, modal e aviso
+ * ------------------------------------------------------------------ */
+
+.t20-tooltip,
+[data-t20~='tooltip'] {
+  background: var(--surface-alt);
+  border: var(--stroke-hairline) solid var(--accent);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow);
+  animation: t20-tooltip var(--dur-fast) var(--ease-decelerate);
+}
+
+@keyframes t20-tooltip {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.t20-modal-overlay,
+[data-t20~='modal-overlay'] {
+  background: var(--overlay);
+  backdrop-filter: blur(3px);
+  animation: t20-fade var(--dur-base) var(--ease-standard);
+}
+
+.t20-modal-panel,
+[data-t20~='modal-panel'] {
+  animation: t20-modal var(--dur-base) var(--ease-decelerate);
+}
+
+@keyframes t20-modal {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes t20-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Pergaminho desenrolando: a origem no topo é o que faz descer em vez de crescer. */
+.t20-toast,
+[data-t20~='toast'] {
+  transform-origin: top center;
+  animation: t20-unroll var(--dur-base) var(--ease-decelerate);
+}
+
+@keyframes t20-unroll {
+  from {
+    opacity: 0;
+    transform: scaleY(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Item 14 — extremos da rolagem
+ * ------------------------------------------------------------------ */
+
+.t20-crit,
+[data-t20~='crit'] {
+  animation:
+    t20-crit-halo 400ms var(--ease-standard),
+    t20-shake 240ms var(--ease-standard);
+}
+
+@keyframes t20-crit-halo {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 60%, transparent);
+  }
+  60% {
+    box-shadow: 0 0 18px 6px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
+  }
+}
+
+@keyframes t20-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+
+.t20-fumble,
+[data-t20~='fumble'] {
+  animation: t20-fumble 500ms var(--ease-standard);
+}
+
+@keyframes t20-fumble {
+  0% {
+    filter: saturate(1);
+  }
+  25% {
+    filter: saturate(0.3);
+  }
+  100% {
+    filter: saturate(1);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Movimento reduzido
+ * ------------------------------------------------------------------ */
+
+/*
+ * Cada efeito acima existe para acompanhar uma mudança de estado — o card ficou
+ * ativo, o aviso chegou, o dado parou. Com movimento reduzido, o estado final
+ * continua valendo e só o percurso até ele desaparece: nada some da tela, nada
+ * fica invisível esperando uma animação que não vai rodar.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    transition: none;
+  }
+
+  .t20-corners::before,
+  [data-t20~='corners']::before,
+  .t20-corners::after,
+  [data-t20~='corners']::after {
+    transition: none;
+  }
+
+  .t20-ruby-thread.is-active::before,
+  [data-t20~='ruby-thread'].is-active::before {
+    animation: none;
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  .t20-sheen::after,
+  [data-t20~='sheen']::after {
+    animation: none !important;
+  }
+
+  .t20-skeleton::after,
+  [data-t20~='skeleton']::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  .t20-tooltip,
+  [data-t20~='tooltip'],
+  .t20-modal-overlay,
+  [data-t20~='modal-overlay'],
+  .t20-modal-panel,
+  [data-t20~='modal-panel'],
+  .t20-toast,
+  [data-t20~='toast'],
+  .t20-crit,
+  [data-t20~='crit'],
+  .t20-fumble,
+  [data-t20~='fumble'] {
+    animation: none;
+  }
+}
+
+/*
+ * A mesma supressão, disponível por classe.
+ *
+ * O guia de estilo precisa demonstrar como cada ornamento se comporta com
+ * movimento reduzido, e ninguém vai abrir as configurações do sistema no meio
+ * da demonstração. Marcar o contêiner com esta classe produz o mesmo resultado
+ * da preferência real.
+ */
+.t20-still,
+[data-t20~='still'],
+.t20-still *,
+[data-t20~='still'] * {
+  animation: none !important;
+  transition: none !important;
+}
+
+.t20-still .t20-ruby-thread.is-active::before,
+[data-t20~='still'] [data-t20~='ruby-thread'].is-active::before {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.t20-still .t20-skeleton::after,
+[data-t20~='still'] [data-t20~='skeleton']::after {
+  opacity: 0;
+}

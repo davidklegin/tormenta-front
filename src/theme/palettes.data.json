@@ -1,0 +1,119 @@
+{
+  "$comment": [
+    "FONTE ÚNICA DE VERDADE DAS CORES DO APLICATIVO.",
+    "",
+    "É JSON, e não TypeScript, por um motivo prático: o mesmo arquivo é lido",
+    "pelo aplicativo (React Native, via import) e pelo gerador do theme.css",
+    "(Node, via readFileSync). Assim a web e o celular não podem divergir —",
+    "não existe uma segunda cópia das cores para esquecer de atualizar.",
+    "",
+    "Para regenerar o CSS depois de mexer aqui:  node tools/gen-theme-css.mjs",
+    "",
+    "Os nomes marcados como (briefing) têm o valor exatamente como especificado.",
+    "Os demais são derivados, e cada um existe por uma razão registrada em",
+    "palettes.ts — em geral, garantir contraste AA onde a cor do briefing é",
+    "decorativa demais para carregar texto."
+  ],
+
+  "light": {
+    "$name": "Pergaminho",
+    "$scheme": "light",
+
+    "bg": "#F4EDE1",
+    "surface": "#FBF6EC",
+    "surfaceAlt": "#EDE3D2",
+    "border": "#D9C7A7",
+    "text": "#2B2119",
+    "textMuted": "#6B5B48",
+    "primary": "#A4161A",
+    "primaryHover": "#7F1113",
+    "primaryContrast": "#FBF6EC",
+    "accent": "#B8860B",
+    "accentSoft": "#E8C878",
+    "danger": "#8B1A1A",
+    "success": "#4F7942",
+    "info": "#2F5D8C",
+    "shadow": "0 2px 8px rgba(43, 33, 25, 0.12)",
+
+    "surfaceHover": "#E4D8C2",
+    "borderStrong": "#9C8355",
+    "textSubtle": "#726250",
+    "onPrimary": "#FBF6EC",
+    "onAccent": "#2B2119",
+    "warning": "#8A5A08",
+
+    "primaryInk": "#A4161A",
+    "accentInk": "#7A5806",
+    "successInk": "#3F6234",
+    "warningInk": "#8A5A08",
+    "dangerInk": "#8B1A1A",
+    "infoInk": "#2F5D8C",
+    "neutralInk": "#6B5B48",
+
+    "primaryFill": "#F5DEDD",
+    "accentFill": "#F0E0BB",
+    "successFill": "#E2EDDD",
+    "warningFill": "#F5E7C9",
+    "dangerFill": "#F3DCDA",
+    "infoFill": "#DFE8F1",
+    "neutralFill": "#EDE3D2",
+
+    "hpTrack": "#E4D3C4",
+    "mpTrack": "#DDE3EA",
+
+    "overlay": "rgba(43, 33, 25, 0.45)",
+    "shade": "rgba(43, 33, 25, 0.22)",
+    "glow": "rgba(164, 22, 26, 0.28)"
+  },
+
+  "dark": {
+    "$name": "Tempestade Rubra",
+    "$scheme": "dark",
+
+    "bg": "#12100F",
+    "surface": "#1B1817",
+    "surfaceAlt": "#241F1D",
+    "border": "#3A322D",
+    "text": "#EDE3D2",
+    "textMuted": "#A0907C",
+    "primary": "#E5383B",
+    "primaryHover": "#FF5A5D",
+    "primaryContrast": "#12100F",
+    "accent": "#E0B354",
+    "accentSoft": "#8A6B28",
+    "danger": "#E5383B",
+    "success": "#6FA45C",
+    "info": "#6C9BD1",
+    "shadow": "0 2px 12px rgba(0, 0, 0, 0.55)",
+
+    "surfaceHover": "#2E2825",
+    "borderStrong": "#7A6B5E",
+    "textSubtle": "#948573",
+    "onPrimary": "#0C0A09",
+    "onAccent": "#0C0A09",
+    "warning": "#E0B354",
+
+    "primaryInk": "#F2585B",
+    "accentInk": "#E0B354",
+    "successInk": "#6FA45C",
+    "warningInk": "#E0B354",
+    "dangerInk": "#F2585B",
+    "infoInk": "#6C9BD1",
+    "neutralInk": "#A0907C",
+
+    "primaryFill": "#3A1A1B",
+    "accentFill": "#3A2E14",
+    "successFill": "#1E2A19",
+    "warningFill": "#33280F",
+    "dangerFill": "#3A1A1B",
+    "infoFill": "#1A2430",
+    "neutralFill": "#241F1D",
+
+    "hpTrack": "#2E1E1E",
+    "mpTrack": "#1C2430",
+
+    "overlay": "rgba(6, 5, 4, 0.72)",
+    "shade": "rgba(0, 0, 0, 0.38)",
+    "glow": "rgba(229, 56, 59, 0.35)"
+  }
+}

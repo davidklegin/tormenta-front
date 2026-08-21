@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="%LANG_ISO_CODE%" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>%WEB_TITLE%</title>
+
+    <!--
+      Casca HTML da versão web.
+
+      O Expo usa este arquivo no lugar do template padrão quando ele existe em
+      public/ (veja webTemplate.js do @expo/cli). Ele precisa manter três coisas
+      intactas para o bundle continuar entrando: os marcadores %LANG_ISO_CODE% e
+      %WEB_TITLE%, o bloco <style id="expo-reset"> e a <div id="root">.
+    -->
+
+    <!--
+      Sem link de fonte externa: o tema usa Arial, que já existe no aparelho.
+      Uma requisição a menos no caminho crítico, e nenhum instante de texto
+      esperando download no meio de uma sessão de jogo.
+    -->
+
+    <!--
+      Caminhos absolutos, e não relativos: a versão web é uma página única, e a
+      mesma index.html responde por /web/personagens/5 — onde "theme.css" viraria
+      "/web/personagens/theme.css". O prefixo acompanha expo.experiments.baseUrl
+      do app.json, e tools/build-web.mjs confere que os dois seguem iguais.
+    -->
+    <!-- Tokens do tema. Gerado por tools/gen-theme-css.mjs. -->
+    <link rel="stylesheet" href="/web/theme.css" />
+    <!-- Ornamentos: grão, atmosfera, foco, barra de rolagem, capitular. -->
+    <link rel="stylesheet" href="/web/ornaments.css" />
+
+    <script>
+      /*
+       * Tema antes do primeiro quadro.
+       *
+       * Roda de forma síncrona, no <head>, antes de qualquer pintura e muito
+       * antes de o bundle do aplicativo carregar. É isto que elimina o piscar:
+       * quando o navegador desenha o primeiro pixel, o data-theme correto já
+       * está no <html> e o theme.css acima já sabe que cores usar.
+       *
+       * A ordem é: preferência salva pelo usuário; na falta dela, o que o
+       * sistema pede; na falta dos dois, o escuro — que é como o aplicativo
+       * sempre se apresentou.
+       *
+       * Tudo dentro de try: localStorage lança em janela anônima e com cookies
+       * bloqueados, e um tema que não carregou não pode derrubar a página.
+       */
+      (function () {
+        var tema = 'dark';
+
+        try {
+          var salvo = window.localStorage.getItem('tormenta20.theme');
+
+          if (salvo === 'light' || salvo === 'dark') {
+            tema = salvo;
+          } else if (window.matchMedia) {
+            tema = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+        } catch (erro) {
+          /* Sem armazenamento disponível: segue o padrão. */
+        }
+
+        document.documentElement.setAttribute('data-theme', tema);
+      })();
+    </script>
+
+    <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
+    <style id="expo-reset">
+      /* These styles make the body full-height */
+      html,
+      body {
+        height: 100%;
+      }
+      /* These styles disable body scrolling if you are using <ScrollView> */
+      body {
+        overflow: hidden;
+      }
+      /* These styles make the root element full-height */
+      #root {
+        display: flex;
+        height: 100%;
+        flex: 1;
+        /* Acima do grão e da atmosfera, que são camadas fixas em z-index 0. */
+        position: relative;
+        z-index: 1;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Use static rendering with Expo Router to support running without JavaScript. -->
+    <noscript> Este aplicativo precisa de JavaScript para funcionar. </noscript>
+    <!-- The root element for your Expo app. -->
+    <div id="root"></div>
+  </body>
+</html>
