@@ -8,6 +8,10 @@ import { severityFor } from '@/rules';
 /**
  * Card da tela inicial do jogador (briefing §8): foto, nome, raça, classe,
  * nível e campanha.
+ *
+ * Na lista geral, a ficha é de outra pessoa, então o card também diz de quem
+ * é. O `player` só vem preenchido nessa lista — na minha, seria repetir meu
+ * próprio nome em cada card.
  */
 export function CharacterCard({ character, onPress }: { character: CharacterSummary; onPress?: () => void }) {
   const { colors } = useTheme();
@@ -81,6 +85,15 @@ export function CharacterCard({ character, onPress }: { character: CharacterSumm
               Ainda não está em uma campanha
             </Text>
           )}
+
+          {character.player && !character.is_owner ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Icon name="personagens" size={13} color={colors.textSubtle} />
+              <Text variant="small" tone="muted" numberOfLines={1} style={{ flex: 1 }}>
+                {character.player.name}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
 

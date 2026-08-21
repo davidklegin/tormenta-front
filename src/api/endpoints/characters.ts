@@ -8,6 +8,7 @@ import type {
   CharacterNote,
   CharacterPower,
   CharacterResource,
+  CharacterScope,
   CharacterSkill,
   CharacterSpell,
   CharacterSummary,
@@ -53,7 +54,13 @@ export type VitalsResponse = {
 };
 
 export const charactersApi = {
-  list: () => apiRequest<Envelope<CharacterSummary[]>>('/characters').then((r) => r.data),
+  /**
+   * `scope` escolhe a lista: 'mine' (padrão) são as minhas fichas e 'all' é a
+   * base inteira. `q` busca por nome — a lista geral vem cortada no servidor,
+   * então é por ela que se acha uma ficha específica.
+   */
+  list: (params?: { scope?: CharacterScope; q?: string }) =>
+    apiRequest<Envelope<CharacterSummary[]>>('/characters', { query: params }).then((r) => r.data),
 
   get: (id: number) => apiRequest<Envelope<Character>>(`/characters/${id}`).then((r) => r.data),
 

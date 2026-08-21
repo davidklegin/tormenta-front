@@ -23,15 +23,17 @@ export function useCampaigns() {
 }
 
 /**
- * O catálogo aberto: mesas públicas de todo mundo.
+ * O catálogo aberto: todas as mesas, de todo mundo.
  *
- * A busca vai ao servidor porque o catálogo devolve as mais recentes, e não a
- * base inteira — é assim que se acha uma campanha antiga.
+ * Usa `scope=all` e não `public` porque a leitura é aberta
+ * (CampaignPolicy::view) — mesa privada aparece aqui, só não tem entrada
+ * livre. A busca vai ao servidor porque o catálogo devolve as mais recentes, e
+ * não a base inteira — é assim que se acha uma campanha antiga.
  */
 export function usePublicCampaigns(q = '') {
   return useQuery<Campaign[]>({
     queryKey: campaignKeys.catalog(q),
-    queryFn: () => campaignsApi.list({ scope: 'public', q: q || undefined }),
+    queryFn: () => campaignsApi.list({ scope: 'all', q: q || undefined }),
     staleTime: 1000 * 30,
   });
 }

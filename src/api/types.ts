@@ -36,6 +36,9 @@ export type CampaignVisibility = 'public' | 'private';
 /** Qual lista de campanhas pedir: as minhas, o catálogo aberto, ou as duas. */
 export type CampaignScope = 'mine' | 'public' | 'all';
 
+/** 'mine' são as minhas fichas; 'all' é a base inteira (a leitura é aberta). */
+export type CharacterScope = 'mine' | 'all';
+
 export type Campaign = {
   id: number;
   name: string;

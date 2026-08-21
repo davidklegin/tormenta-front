@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import type { CampaignNote, NoteCategory } from '@/api/types';
+import { campaignsApi } from '@/api';
+import type { CampaignNote, CampaignNoteImage, NoteCategory } from '@/api/types';
 import {
   Button,
   Card,
@@ -18,8 +19,17 @@ import {
   Text,
 } from '@/components/ui';
 import { PageHeader } from '@/components/layout';
-import { NoteImages } from '@/components/campaign/NoteImages';
-import { useCampaign, useCampaignNoteMutations, useCampaignNotes } from '@/hooks/useCampaigns';
+import {
+  NoteImages,
+  buildNoteImageForm,
+  type PendingNoteImage,
+} from '@/components/campaign/NoteImages';
+import {
+  campaignKeys,
+  useCampaign,
+  useCampaignNoteMutations,
+  useCampaignNotes,
+} from '@/hooks/useCampaigns';
 import { useCampaignChannel } from '@/realtime/useCampaignChannel';
 import { NOTE_CATEGORY_LABELS } from '@/rules';
 import { radius, spacing, useTheme } from '@/theme';
@@ -244,7 +254,39 @@ function NoteForm({
   const [category, setCategory] = useState<NoteCategory>(note?.category ?? defaultCategory);
   const [masterOnly, setMasterOnly] = useState(note?.visibility === 'master_only');
 
+  // Imagens escolhidas antes de a anotação existir — sobem depois do create.
+  const [pending, setPending] = useState<PendingNoteImage[]>([]);
+  const [imageError, setImageError] = useState<string | null>(null);
+
+  // Se o create passou mas um upload falhou, a anotação já existe: um segundo
+  // "Salvar" precisa editá-la e retentar as imagens, nunca criar outra.
+  const criada = useRef<CampaignNote | null>(null);
+  const [salvando, setSalvando] = useState(false);
+
+  const alvo = note ?? criada.current;
+
+  const invalidarNotas = () =>
+    void queryClient.invalidateQueries({ queryKey: campaignKeys.notes(campaignId) });
+
+  /** Sair descarta o que ainda não subiu — e desfaz o vínculo com o que foi criado. */
+  function fechar() {
+    criada.current = null;
+    setPending([]);
+    setImageError(null);
+    onClose();
+  }
+
   async function handleSave() {
+    setSalvando(true);
+
+    try {
+      await salvar();
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function salvar() {
     const payload = {
       title: title.trim(),
       body: body.trim(),
@@ -252,27 +294,62 @@ function NoteForm({
       visibility: masterOnly && isMaster ? 'master_only' : 'campaign',
     };
 
-    if (note) {
-      await update.mutateAsync({ id: note.id, ...payload });
-    } else {
-      await create.mutateAsync(payload);
+    const salva = alvo
+      ? await update.mutateAsync({ id: alvo.id, ...payload })
+      : await create.mutateAsync(payload);
+
+    if (!note) criada.current = salva;
+
+    if (pending.length > 0) {
+      const restantes: PendingNoteImage[] = [];
+      const enviadas: CampaignNoteImage[] = [];
+
+      for (const imagem of pending) {
+        try {
+          enviadas.push(
+            await campaignsApi.addNoteImage(campaignId, salva.id, await buildNoteImageForm(imagem))
+          );
+        } catch {
+          restantes.push(imagem);
+        }
+      }
+
+      // A nota que acabou de nascer não conhece as imagens dela: sem isto, um
+      // envio parcial esconderia da tira o que já subiu.
+      if (criada.current) {
+        criada.current = {
+          ...criada.current,
+          images: [...(criada.current.images ?? []), ...enviadas],
+        };
+      }
+
+      setPending(restantes);
+      invalidarNotas();
+
+      if (restantes.length > 0) {
+        setImageError(
+          'A anotação foi salva, mas não conseguimos enviar todas as imagens. Tente salvar de novo.'
+        );
+
+        return;
+      }
     }
 
-    onClose();
+    fechar();
   }
 
   return (
     <Sheet
       visible={visible}
-      onClose={onClose}
+      onClose={fechar}
       title={note ? 'Editar anotação' : 'Nova anotação'}
       footer={
         <>
-          <Button label="Cancelar" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+          <Button label="Cancelar" variant="ghost" onPress={fechar} style={{ flex: 1 }} />
           <Button
             label="Salvar"
             onPress={handleSave}
-            loading={create.isPending || update.isPending}
+            loading={salvando || create.isPending || update.isPending}
             style={{ flex: 1 }}
           />
         </>
@@ -290,24 +367,29 @@ function NoteForm({
 
       <Input label="Texto" value={body} onChangeText={setBody} multiline />
 
-      {note ? (
-        <View style={{ gap: spacing.sm }}>
-          <Text variant="smallStrong" tone="secondary">
-            Imagens
-          </Text>
-          <NoteImages
-            campaignId={campaignId}
-            noteId={note.id}
-            images={note.images ?? []}
-            editable={note.can_edit}
-            onChanged={() => void queryClient.invalidateQueries({ queryKey: ['campaign-notes', campaignId] })}
-          />
-        </View>
-      ) : (
-        <Text variant="small" tone="muted">
-          Salve a anotação para poder anexar imagens — o retrato do NPC, o mapa do lugar.
+      <View style={{ gap: spacing.sm }}>
+        <Text variant="smallStrong" tone="secondary">
+          Imagens
         </Text>
-      )}
+
+        {/* Sem anotação salva ainda (NPC sendo cadastrado), as escolhas ficam
+            em espera e sobem junto com o "Salvar". */}
+        <NoteImages
+          campaignId={campaignId}
+          noteId={alvo?.id ?? null}
+          images={alvo?.images ?? []}
+          editable={alvo ? alvo.can_edit : true}
+          onChanged={invalidarNotas}
+          pending={pending}
+          onPendingChange={setPending}
+        />
+
+        {imageError ? (
+          <Text variant="small" tone="danger">
+            {imageError}
+          </Text>
+        ) : null}
+      </View>
 
       {isMaster ? (
         <Pressable

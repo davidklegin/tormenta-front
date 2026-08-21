@@ -163,8 +163,8 @@ export default function CampaignScreen() {
             />
             <Text variant="caption" tone="muted">
               {data.visibility === 'public'
-                ? 'A mesa aparece em Explorar e qualquer jogador pode entrar sem código. O Painel do Mestre e as anotações marcadas "somente o mestre" continuam só seus.'
-                : 'Só os membros veem esta campanha. Para entrar, é preciso o código de convite.'}
+                ? 'Qualquer jogador entra com um toque, sem código. O Painel do Mestre e as anotações marcadas "somente o mestre" continuam só seus.'
+                : 'A mesa continua à vista da comunidade, em leitura — o que muda é a entrada: só entra quem tiver o código de convite. O Painel do Mestre e as anotações marcadas "somente o mestre" continuam só seus.'}
             </Text>
           </View>
         </Card>

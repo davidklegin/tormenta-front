@@ -4,6 +4,7 @@ import type { Character, CharacterSummary } from '@/api/types';
 
 export const characterKeys = {
   all: ['characters'] as const,
+  catalog: (q: string) => ['characters', 'all', q] as const,
   detail: (id: number) => ['character', id] as const,
   skills: (id: number) => ['character', id, 'skills'] as const,
   items: (id: number) => ['character', id, 'items'] as const,
@@ -15,11 +16,27 @@ export const characterKeys = {
   resources: (id: number) => ['character', id, 'resources'] as const,
 };
 
-/** Tela inicial do jogador (briefing §8). */
+/** Tela inicial do jogador (briefing §8) — as fichas dele. */
 export function useCharacters() {
   return useQuery<CharacterSummary[]>({
     queryKey: characterKeys.all,
-    queryFn: charactersApi.list,
+    // Fechado numa lambda de propósito: o React Query passa o contexto da
+    // query como primeiro argumento, e ele viraria querystring.
+    queryFn: () => charactersApi.list(),
+    staleTime: 1000 * 30,
+  });
+}
+
+/**
+ * Todas as fichas da base — a leitura é aberta (CharacterPolicy::view).
+ *
+ * A busca vai ao servidor porque a lista geral devolve as mais recentes, e não
+ * a base inteira; é assim que se acha uma ficha antiga.
+ */
+export function useAllCharacters(q = '') {
+  return useQuery<CharacterSummary[]>({
+    queryKey: characterKeys.catalog(q),
+    queryFn: () => charactersApi.list({ scope: 'all', q: q || undefined }),
     staleTime: 1000 * 30,
   });
 }

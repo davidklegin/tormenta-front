@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { charactersApi } from '@/api';
+import { ApiError, charactersApi } from '@/api';
 import type { Character, CharacterItem } from '@/api/types';
 import { Button, Card, Chip, HelpNote, Icon, Input, ProgressBar, Select, Sheet, Text } from '@/components/ui';
 import { SheetScreen } from '@/components/character/SheetScreen';
@@ -254,6 +254,14 @@ function EquipmentContent({ characterId, character }: { characterId: number; cha
           </>
         }
       >
+        {saveMoney.isError ? (
+          <Text variant="small" tone="danger">
+            {saveMoney.error instanceof ApiError && saveMoney.error.message
+              ? saveMoney.error.message
+              : 'Não foi possível salvar o dinheiro. Tente de novo.'}
+          </Text>
+        ) : null}
+
         <Input
           label="Tibares (T$)"
           value={money}
@@ -320,6 +328,16 @@ function ItemForm({
         </>
       }
     >
+      {/* Sem este aviso a falha era silenciosa: o formulário continuava aberto
+          como se nada tivesse acontecido, e o jogador clicava em Salvar de novo. */}
+      {save.isError ? (
+        <Text variant="small" tone="danger">
+          {save.error instanceof ApiError && save.error.message
+            ? save.error.message
+            : 'Não foi possível salvar o item. Tente de novo.'}
+        </Text>
+      ) : null}
+
       <Select
         label="Do livro (opcional)"
         value={catalogId}

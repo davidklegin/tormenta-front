@@ -9,10 +9,68 @@ import { Button, Icon, Text } from '@/components/ui';
 import { radius, spacing, stroke, useTheme } from '@/theme';
 
 /**
+ * Imagem escolhida antes de a anotação existir — ainda sem id do servidor.
+ *
+ * Cadastrando um NPC novo não há onde anexar o retrato: a anotação só ganha id
+ * ao ser salva. Então a imagem espera aqui, e quem salva o formulário envia.
+ */
+export type PendingNoteImage = {
+  key: string;
+  uri: string;
+  name: string;
+  type: string;
+};
+
+let sequencia = 0;
+
+/** Abre a galeria e devolve o que foi escolhido, já no formato do upload. */
+export async function pickNoteImages(): Promise<PendingNoteImage[]> {
+  const resultado = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['images'],
+    allowsMultipleSelection: true,
+    selectionLimit: 10,
+    quality: 0.85,
+  });
+
+  if (resultado.canceled) return [];
+
+  return resultado.assets.map((asset) => ({
+    key: `pendente-${(sequencia += 1)}`,
+    uri: asset.uri,
+    name: asset.fileName ?? 'imagem.jpg',
+    type: asset.mimeType ?? 'image/jpeg',
+  }));
+}
+
+/**
+ * Monta o corpo do upload.
+ *
+ * Na web o picker devolve uma URI de blob; no celular, um caminho de arquivo.
+ * O FormData precisa de formatos diferentes nos dois casos.
+ */
+export async function buildNoteImageForm(imagem: PendingNoteImage): Promise<FormData> {
+  const form = new FormData();
+
+  if (Platform.OS === 'web') {
+    const resposta = await fetch(imagem.uri);
+    form.append('image', await resposta.blob(), imagem.name);
+  } else {
+    form.append('image', { uri: imagem.uri, name: imagem.name, type: imagem.type } as never);
+  }
+
+  return form;
+}
+
+const MINIATURA = 96;
+
+/**
  * Imagens de uma anotação — retrato do NPC, mapa do lugar, brasão da guilda.
  *
  * Um NPC descrito só por texto é difícil de reconhecer sessões depois; a
  * miniatura resolve na hora, e tocar nela abre em tela cheia.
+ *
+ * Com `noteId`, cada imagem escolhida sobe na hora. Sem ele — anotação ainda
+ * sendo cadastrada — as escolhas ficam em `pending` até o formulário salvar.
  */
 export function NoteImages({
   campaignId,
@@ -20,55 +78,52 @@ export function NoteImages({
   images,
   editable,
   onChanged,
+  pending = [],
+  onPendingChange,
 }: {
   campaignId: number;
-  noteId: number;
+  noteId: number | null;
   images: CampaignNoteImage[];
   editable: boolean;
   onChanged: () => void;
+  pending?: PendingNoteImage[];
+  onPendingChange?: (imagens: PendingNoteImage[]) => void;
 }) {
   const { colors } = useTheme();
   const [ampliada, setAmpliada] = useState<CampaignNoteImage | null>(null);
   const [erro, setErro] = useState<string | null>(null);
 
-  const enviar = useMutation({
+  const total = images.length + pending.length;
+
+  const escolher = useMutation({
     mutationFn: async () => {
-      const resultado = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.85,
-      });
+      const escolhidas = await pickNoteImages();
 
-      if (resultado.canceled || !resultado.assets[0]) return null;
+      if (escolhidas.length === 0) return false;
 
-      const asset = resultado.assets[0];
-      const form = new FormData();
+      if (noteId === null) {
+        onPendingChange?.([...pending, ...escolhidas]);
 
-      // Na web o picker devolve uma URI de blob; no celular, um caminho de
-      // arquivo. O FormData precisa de formatos diferentes nos dois casos.
-      if (Platform.OS === 'web') {
-        const resposta = await fetch(asset.uri);
-        form.append('image', await resposta.blob(), asset.fileName ?? 'imagem.jpg');
-      } else {
-        form.append('image', {
-          uri: asset.uri,
-          name: asset.fileName ?? 'imagem.jpg',
-          type: asset.mimeType ?? 'image/jpeg',
-        } as never);
+        return false;
       }
 
-      return campaignsApi.addNoteImage(campaignId, noteId, form);
+      // O endpoint recebe uma imagem por vez; a seleção múltipla vira uma
+      // sequência de envios.
+      for (const imagem of escolhidas) {
+        await campaignsApi.addNoteImage(campaignId, noteId, await buildNoteImageForm(imagem));
+      }
+
+      return true;
     },
-    onSuccess: (imagem) => {
-      if (imagem) {
-        setErro(null);
-        onChanged();
-      }
+    onSuccess: (enviou) => {
+      setErro(null);
+      if (enviou) onChanged();
     },
     onError: () => setErro('Não foi possível enviar a imagem.'),
   });
 
   const remover = useMutation({
-    mutationFn: (imageId: number) => campaignsApi.removeNoteImage(campaignId, noteId, imageId),
+    mutationFn: (imageId: number) => campaignsApi.removeNoteImage(campaignId, noteId!, imageId),
     onSuccess: () => {
       setAmpliada(null);
       onChanged();
@@ -77,7 +132,7 @@ export function NoteImages({
 
   return (
     <View style={{ gap: spacing.sm }}>
-      {images.length > 0 ? (
+      {total > 0 ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
             {images.map((imagem) => (
@@ -87,8 +142,8 @@ export function NoteImages({
                 accessibilityRole="imagebutton"
                 accessibilityLabel={imagem.caption ?? 'Imagem da anotação'}
                 style={({ pressed }) => ({
-                  width: 96,
-                  height: 96,
+                  width: MINIATURA,
+                  height: MINIATURA,
                   borderRadius: radius.md,
                   overflow: 'hidden',
                   borderWidth: stroke.hairline,
@@ -104,19 +159,71 @@ export function NoteImages({
                 />
               </Pressable>
             ))}
+
+            {pending.map((imagem) => (
+              <View
+                key={imagem.key}
+                style={{
+                  width: MINIATURA,
+                  height: MINIATURA,
+                  borderRadius: radius.md,
+                  overflow: 'hidden',
+                  borderWidth: stroke.hairline,
+                  borderStyle: 'dashed',
+                  borderColor: colors.accentInk,
+                }}
+              >
+                <Image
+                  source={{ uri: imagem.uri }}
+                  style={{ width: '100%', height: '100%' }}
+                  contentFit="cover"
+                  transition={150}
+                />
+
+                {editable ? (
+                  <Pressable
+                    onPress={() => onPendingChange?.(pending.filter((item) => item.key !== imagem.key))}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel="Descartar imagem"
+                    style={{
+                      position: 'absolute',
+                      top: spacing.xs,
+                      right: spacing.xs,
+                      width: 22,
+                      height: 22,
+                      borderRadius: 11,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: colors.overlay,
+                    }}
+                  >
+                    <Icon name="remover" size={14} color={colors.onPrimary} />
+                  </Pressable>
+                ) : null}
+              </View>
+            ))}
           </View>
         </ScrollView>
       ) : null}
 
       {editable ? (
         <Button
-          label={images.length > 0 ? 'Adicionar outra imagem' : 'Adicionar imagem'}
+          label={total > 0 ? 'Adicionar outra imagem' : 'Adicionar imagem'}
           variant="secondary"
           size="sm"
-          onPress={() => enviar.mutate()}
-          loading={enviar.isPending}
+          onPress={() => escolher.mutate()}
+          loading={escolher.isPending}
           icon={<Icon name="adicionar" size={16} color={colors.accentInk} />}
         />
+      ) : null}
+
+      {pending.length > 0 ? (
+        <Text variant="caption" tone="muted">
+          {pending.length === 1
+            ? '1 imagem será enviada ao salvar.'
+            : `${pending.length} imagens serão enviadas ao salvar.`}
+        </Text>
       ) : null}
 
       {erro ? (
@@ -157,7 +264,7 @@ export function NoteImages({
 
             <View style={{ flexDirection: 'row', gap: spacing.sm, justifyContent: 'center' }}>
               <Button label="Fechar" variant="secondary" onPress={() => setAmpliada(null)} />
-              {editable && ampliada ? (
+              {editable && ampliada && noteId !== null ? (
                 <Button
                   label="Remover"
                   variant="danger"

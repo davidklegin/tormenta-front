@@ -26,14 +26,14 @@ import {
 } from '@/hooks/useCampaigns';
 import { spacing, useTheme } from '@/theme';
 
-type Aba = 'minhas' | 'explorar';
+type Aba = 'minhas' | 'todas';
 
 /**
  * Campanhas: as minhas e as de todo mundo (briefing §16).
  *
- * As mesas são públicas por padrão, então a tela tem duas listas. "Minhas" é
- * onde se joga; "Explorar" é o catálogo aberto, de onde se entra numa mesa com
- * um toque, sem depender de o mestre passar código.
+ * A leitura é aberta, então a tela tem duas listas. "Minhas" é onde se joga;
+ * "Todas" é a base inteira — mesas públicas, de onde se entra com um toque, e
+ * fechadas, que se lê mas só se entra com o código do mestre.
  */
 export default function CampaignsScreen() {
   const { colors } = useTheme();
@@ -42,7 +42,7 @@ export default function CampaignsScreen() {
   const [busca, setBusca] = useState('');
 
   const campaigns = useCampaigns();
-  const catalogo = usePublicCampaigns(aba === 'explorar' ? busca.trim() : '');
+  const catalogo = usePublicCampaigns(aba === 'todas' ? busca.trim() : '');
   const createCampaign = useCreateCampaign();
   const joinCampaign = useJoinCampaign();
   const joinPublic = useJoinPublicCampaign();
@@ -113,7 +113,7 @@ export default function CampaignsScreen() {
     >
       <PageHeader
         title="Campanhas"
-        subtitle={aba === 'minhas' ? 'Mesas das quais você participa' : 'Mesas abertas de toda a comunidade'}
+        subtitle={aba === 'minhas' ? 'Mesas das quais você participa' : 'Todas as mesas da comunidade'}
         actions={
           <>
             <Button
@@ -132,11 +132,11 @@ export default function CampaignsScreen() {
         onChange={setAba}
         segments={[
           { value: 'minhas', label: 'Minhas', badge: campaigns.data?.length || undefined },
-          { value: 'explorar', label: 'Explorar' },
+          { value: 'todas', label: 'Todas' },
         ]}
       />
 
-      {aba === 'explorar' ? (
+      {aba === 'todas' ? (
         <Input
           placeholder="Buscar mesa pelo nome…"
           value={busca}
@@ -150,7 +150,7 @@ export default function CampaignsScreen() {
       {lista.isLoading ? (
         <Loading label={aba === 'minhas' ? 'Carregando campanhas…' : 'Procurando mesas…'} />
       ) : (lista.data ?? []).length === 0 ? (
-        <ListaVazia aba={aba} busca={busca} onCriar={() => setCreateOpen(true)} onExplorar={() => setAba('explorar')} />
+        <ListaVazia aba={aba} busca={busca} onCriar={() => setCreateOpen(true)} onExplorar={() => setAba('todas')} />
       ) : (
         <ResponsiveGrid columns={{ phone: 1, tablet: 2, desktop: 3 }}>
           {(lista.data ?? []).map((campaign) => (
@@ -168,7 +168,7 @@ export default function CampaignsScreen() {
         </ResponsiveGrid>
       )}
 
-      {aba === 'explorar' && (catalogo.data ?? []).length > 0 ? (
+      {aba === 'todas' && (catalogo.data ?? []).length > 0 ? (
         <Text variant="caption" tone="muted">
           O catálogo mostra as mesas com movimento mais recente. Para achar outra, busque pelo nome.
         </Text>
@@ -205,8 +205,8 @@ export default function CampaignsScreen() {
           placeholder="Do que se trata a campanha?"
         />
         <Text variant="small" tone="muted">
-          A mesa nasce pública: aparece em Explorar e qualquer jogador pode entrar. Você fecha quando
-          quiser, na tela da campanha.
+          A mesa nasce pública: qualquer jogador pode entrar com um toque. Você fecha quando quiser,
+          na tela da campanha — fechada, ela continua à vista, mas só entra quem tiver o código.
         </Text>
         {formError ? (
           <Text variant="small" tone="danger">
@@ -242,7 +242,7 @@ export default function CampaignsScreen() {
           placeholder="ABCD1234"
         />
         <Text variant="small" tone="muted">
-          O código é o caminho para as mesas fechadas. As públicas você acha em Explorar.
+          O código é o caminho para as mesas fechadas. As abertas você acha na aba Todas.
         </Text>
         {formError ? (
           <Text variant="small" tone="danger">
@@ -288,7 +288,7 @@ function CampanhaCard({
               compact
             />
           ) : (
-            <Chip label="Aberta" tone="neutral" compact />
+            <Chip label={campaign.visibility === 'private' ? 'Fechada' : 'Aberta'} tone="neutral" compact />
           )}
         </View>
 
@@ -329,15 +329,15 @@ function ListaVazia({
   onCriar: () => void;
   onExplorar: () => void;
 }) {
-  if (aba === 'explorar') {
+  if (aba === 'todas') {
     return (
       <EmptyState
         icon="campanhas"
-        title={busca.trim() ? 'Nenhuma mesa com esse nome' : 'Nenhuma mesa aberta ainda'}
+        title={busca.trim() ? 'Nenhuma mesa com esse nome' : 'Nenhuma mesa ainda'}
         description={
           busca.trim()
             ? 'Tente outro termo — a busca procura no nome e na descrição da campanha.'
-            : 'Crie a primeira mesa pública e ela aparecerá aqui para todo mundo.'
+            : 'Crie a primeira mesa e ela aparecerá aqui para todo mundo.'
         }
         actionLabel="Criar campanha"
         onAction={onCriar}
@@ -350,7 +350,7 @@ function ListaVazia({
       icon="campanhas"
       title="Nenhuma campanha ainda"
       description="Crie uma mesa para mestrar ou entre em uma das mesas abertas da comunidade."
-      actionLabel="Explorar mesas"
+      actionLabel="Ver todas as mesas"
       onAction={onExplorar}
     />
   );
