@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { charactersApi } from '@/api';
-import type { CatalogSpell, SpellTradition } from '@/api/types';
-import { Button, Chip, Icon, Input, Loading, SegmentedControl, Select, Sheet, Text } from '@/components/ui';
+import type { CatalogSpell } from '@/api/types';
+import { Button, Chip, Icon, Input, Loading, SegmentedControl, Sheet, Text } from '@/components/ui';
 import { useSpellCatalog, useSpellCatalogFilters } from '@/hooks/useSpellCatalog';
 import { radius, spacing, tones, useTheme } from '@/theme';
 
@@ -23,7 +23,6 @@ export function SpellCatalogSheet({
   onClose,
   characterId,
   knownSpellIds,
-  suggestedTradition,
   onImported,
 }: {
   visible: boolean;
@@ -31,8 +30,6 @@ export function SpellCatalogSheet({
   characterId: number;
   /** ids da biblioteca que o personagem já conhece. */
   knownSpellIds: number[];
-  /** Tradição da classe conjuradora, usada como filtro inicial. */
-  suggestedTradition?: SpellTradition | null;
   onImported: (added: number) => void;
 }) {
   const { colors } = useTheme();
@@ -41,15 +38,11 @@ export function SpellCatalogSheet({
 
   const [busca, setBusca] = useState('');
   const [circulo, setCirculo] = useState<string>('todos');
-  const [tradicao, setTradicao] = useState<SpellTradition | null>(suggestedTradition ?? null);
-  const [escola, setEscola] = useState<string | null>(null);
   const [selecionadas, setSelecionadas] = useState<number[]>([]);
 
   const catalogo = useSpellCatalog({
     q: busca || undefined,
     circle: circulo === 'todos' ? undefined : Number(circulo),
-    tradition: tradicao ?? undefined,
-    school: escola ?? undefined,
   });
 
   const conhecidas = useMemo(() => new Set(knownSpellIds), [knownSpellIds]);
@@ -70,11 +63,9 @@ export function SpellCatalogSheet({
   const limparFiltros = () => {
     setBusca('');
     setCirculo('todos');
-    setTradicao(null);
-    setEscola(null);
   };
 
-  const temFiltro = busca !== '' || circulo !== 'todos' || tradicao !== null || escola !== null;
+  const temFiltro = busca !== '' || circulo !== 'todos';
 
   return (
     <Sheet
@@ -108,38 +99,6 @@ export function SpellCatalogSheet({
           ...[1, 2, 3, 4, 5].map((n) => ({ value: String(n), label: `${n}º` })),
         ]}
       />
-
-      <View style={{ flexDirection: 'row', gap: spacing.md }}>
-        <View style={{ flex: 1 }}>
-          <Select
-            label="Tipo"
-            value={tradicao}
-            options={(filtros.data?.traditions ?? []).map((t) => ({ value: t.value, label: t.label }))}
-            onChange={(valor) => setTradicao((valor as SpellTradition) ?? null)}
-            clearable
-            searchable={false}
-          />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Select
-            label="Escola"
-            value={escola}
-            options={(filtros.data?.schools ?? []).map((e) => ({ value: e.value, label: e.label }))}
-            onChange={setEscola}
-            clearable
-            searchable={false}
-          />
-        </View>
-      </View>
-
-      {/* Magias universais entram nas duas listas (p. 170) — o filtro por tipo
-          arcana ou divina já as inclui, e dizer isso evita a impressão de que
-          o filtro está trazendo coisa a mais. */}
-      {tradicao === 'arcana' || tradicao === 'divina' ? (
-        <Text variant="caption" tone="muted">
-          Inclui as magias universais, que servem aos dois tipos.
-        </Text>
-      ) : null}
 
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
         <Text variant="caption" tone="secondary" style={{ flex: 1 }}>
