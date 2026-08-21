@@ -18,7 +18,6 @@ export function useCampaigns() {
   return useQuery<Campaign[]>({
     queryKey: campaignKeys.all,
     queryFn: () => campaignsApi.list(),
-    staleTime: 1000 * 60,
   });
 }
 
@@ -34,7 +33,6 @@ export function usePublicCampaigns(q = '') {
   return useQuery<Campaign[]>({
     queryKey: campaignKeys.catalog(q),
     queryFn: () => campaignsApi.list({ scope: 'all', q: q || undefined }),
-    staleTime: 1000 * 30,
   });
 }
 
@@ -62,9 +60,7 @@ export function useMasterDashboard(campaignId: number | null | undefined) {
     queryKey: campaignKeys.dashboard(campaignId ?? 0),
     queryFn: () => campaignsApi.dashboard(campaignId as number),
     enabled: Boolean(campaignId),
-    staleTime: 1000 * 5,
     refetchInterval: realtimeIsUp ? false : 20_000,
-    refetchOnWindowFocus: true,
   });
 }
 

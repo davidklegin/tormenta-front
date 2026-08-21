@@ -23,7 +23,6 @@ export function useSpellCatalog(search: Omit<SpellSearch, 'page' | 'per_page'>) 
     initialPageParam: 1,
     getNextPageParam: (ultima) =>
       ultima.meta.current_page < ultima.meta.last_page ? ultima.meta.current_page + 1 : undefined,
-    staleTime: 1000 * 60 * 30,
   });
 
   const spells: CatalogSpell[] = query.data?.pages.flatMap((p) => p.data) ?? [];
@@ -42,7 +41,6 @@ export function useSpellCatalogFilters() {
   return useQuery<SpellCatalogFilters>({
     queryKey: ['spells', 'filters'],
     queryFn: spellsApi.filters,
-    staleTime: 1000 * 60 * 60 * 12,
   });
 }
 

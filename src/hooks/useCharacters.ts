@@ -23,7 +23,6 @@ export function useCharacters() {
     // Fechado numa lambda de propósito: o React Query passa o contexto da
     // query como primeiro argumento, e ele viraria querystring.
     queryFn: () => charactersApi.list(),
-    staleTime: 1000 * 30,
   });
 }
 
@@ -37,7 +36,6 @@ export function useAllCharacters(q = '') {
   return useQuery<CharacterSummary[]>({
     queryKey: characterKeys.catalog(q),
     queryFn: () => charactersApi.list({ scope: 'all', q: q || undefined }),
-    staleTime: 1000 * 30,
   });
 }
 
@@ -46,7 +44,6 @@ export function useCharacter(id: number | null | undefined) {
     queryKey: characterKeys.detail(id ?? 0),
     queryFn: () => charactersApi.get(id as number),
     enabled: Boolean(id),
-    staleTime: 1000 * 15,
   });
 }
 

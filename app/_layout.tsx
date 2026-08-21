@@ -34,8 +34,15 @@ const queryClient = new QueryClient({
 
         return failureCount < 2;
       },
-      staleTime: 1000 * 30,
-      refetchOnWindowFocus: true,
+      // Sem cache de dados: tudo nasce obsoleto (staleTime 0), some da memória
+      // assim que a tela desmonta (gcTime 0) e é buscado de novo a cada
+      // montagem, foco e reconexão. O app nunca mostra número que não tenha
+      // acabado de vir do servidor.
+      staleTime: 0,
+      gcTime: 0,
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: 'always',
+      refetchOnReconnect: 'always',
     },
     mutations: { retry: false },
   },
