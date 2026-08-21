@@ -393,6 +393,20 @@ export type Character = {
     death_threshold: number;
   };
   mp: Vitals & { calculation: Calculation };
+  /**
+   * Atributo-chave da ficha, somado uma vez aos PM totais.
+   *
+   * `selected` é a escolha do jogador; quando nula, `value` traz o herdado da
+   * classe primária e `inherited` fica verdadeiro.
+   */
+  key_attribute: {
+    value: AttributeKey | null;
+    label: string | null;
+    abbreviation: string | null;
+    selected: AttributeKey | null;
+    inherited: boolean;
+    suggested: AttributeKey[];
+  };
   defense: Calculation & { attribute: AttributeKey; other_bonus: number };
   armor_penalty: number;
   carry: {

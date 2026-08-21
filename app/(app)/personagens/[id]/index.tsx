@@ -11,7 +11,7 @@ import { ResourceManager } from '@/components/character/ResourceManager';
 import { SheetScreen } from '@/components/character/SheetScreen';
 import { VitalTracker } from '@/components/character/VitalTracker';
 import { useUpdateVitals } from '@/hooks/useCharacters';
-import { formatSlots, formatTibar, signed } from '@/rules';
+import { attributeValue, formatSlots, formatTibar, signed } from '@/rules';
 import { spacing, useResponsive, useTheme, vitalColors } from '@/theme';
 
 /**
@@ -95,6 +95,7 @@ function CombatContent({ characterId, character }: { characterId: number; charac
             editable={podeAlterar}
             onChange={ajustar('current_mp')}
             onSetValue={definir('current_mp')}
+            footnote={notaDoAtributoChave(character)}
           />
         </View>
       </View>
@@ -228,4 +229,18 @@ function CombatContent({ characterId, character }: { characterId: number; charac
       </Card>
     </View>
   );
+}
+
+/**
+ * De onde vem a parcela de PM que não é da classe: o atributo-chave da ficha,
+ * escolhido pelo jogador ou herdado da classe primária.
+ */
+function notaDoAtributoChave(character: Character): string | undefined {
+  const chave = character.key_attribute.value;
+
+  if (!chave) return undefined;
+
+  const origem = character.key_attribute.inherited ? ', pela classe' : '';
+
+  return `Inclui ${character.key_attribute.label} ${signed(attributeValue(character, chave))} — atributo-chave${origem}.`;
 }

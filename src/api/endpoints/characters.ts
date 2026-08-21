@@ -32,6 +32,8 @@ export type CharacterPayload = {
   defense_attribute?: string;
   defense_other_bonus?: number;
   spell_attribute?: string | null;
+  /** Atributo-chave somado aos PM; nulo herda o da classe primária. */
+  key_attribute?: string | null;
   proficiencies?: string | null;
   money_tibar?: number;
   version?: number;

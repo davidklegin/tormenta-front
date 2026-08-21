@@ -29,6 +29,7 @@ export default function NewCharacterScreen() {
   const [racialChoices, setRacialChoices] = useState<AttributeKey[]>([]);
   const [classKey, setClassKey] = useState<string | null>(null);
   const [level, setLevel] = useState('1');
+  const [keyAttribute, setKeyAttribute] = useState<AttributeKey | null>(null);
   const [originId, setOriginId] = useState<number | null>(null);
   const [deityId, setDeityId] = useState<number | null>(null);
   const [campaignId, setCampaignId] = useState<number | null>(null);
@@ -52,6 +53,15 @@ export default function NewCharacterScreen() {
     [reference.data?.classes, classKey]
   );
 
+  /**
+   * Atributo-chave em uso: o escolhido ou, na falta dele, o primeiro que a
+   * classe declara — a mesma regra que o servidor aplica ao calcular os PM.
+   */
+  const effectiveKeyAttribute = useMemo<AttributeKey | null>(
+    () => keyAttribute ?? gameClass?.key_attributes?.[0] ?? null,
+    [keyAttribute, gameClass?.key_attributes]
+  );
+
   /** Modificadores raciais previstos, incluindo as escolhas livres. */
   const racialPreview = useMemo(() => {
     if (!race) return {} as Partial<Record<AttributeKey, number>>;
@@ -68,6 +78,25 @@ export default function NewCharacterScreen() {
 
     return base;
   }, [race, raceVariant, racialChoices]);
+
+  /** Prévia dos PM: o que a classe dá por nível mais o atributo-chave. */
+  const mpPreview = useMemo(() => {
+    if (!gameClass) return { total: 0, label: '' };
+
+    const levels = Math.max(1, Number.parseInt(level, 10) || 1);
+    const fromClass = gameClass.mp_per_level * levels;
+    const bonus = effectiveKeyAttribute
+      ? attributes[effectiveKeyAttribute] + (racialPreview[effectiveKeyAttribute] ?? 0)
+      : 0;
+    const total = Math.max(0, fromClass + bonus);
+
+    const parts = [`${gameClass.mp_per_level} x ${levels} ${levels === 1 ? 'nível' : 'níveis'} = ${fromClass}`];
+    if (effectiveKeyAttribute) {
+      parts.push(`${ATTRIBUTE_LABELS[effectiveKeyAttribute].full} ${signed(bonus)}`);
+    }
+
+    return { total, label: `PM totais: ${parts.join(', ')} → ${total}` };
+  }, [gameClass, level, effectiveKeyAttribute, attributes, racialPreview]);
 
   function toggleRacialChoice(key: AttributeKey) {
     if (!race) return;
@@ -119,6 +148,7 @@ export default function NewCharacterScreen() {
         deity_id: deityId,
         campaign_id: campaignId,
         attributes,
+        key_attribute: keyAttribute,
         classes: [{ key: classKey, level: Math.max(1, Number.parseInt(level, 10) || 1), is_primary: true }],
       });
 
@@ -220,7 +250,10 @@ export default function NewCharacterScreen() {
                   label: entry.name,
                   description: entry.short_description ?? undefined,
                 }))}
-                onChange={setClassKey}
+                onChange={(value) => {
+                  setClassKey(value);
+                  setKeyAttribute(null);
+                }}
               />
             </View>
             <View style={{ flex: 1 }}>
@@ -313,7 +346,7 @@ export default function NewCharacterScreen() {
               Constituição por nível
             </Text>
             <Text variant="small" tone="secondary">
-              PM: {gameClass.mp_per_level} por nível
+              PM: {gameClass.mp_per_level} por nível + o atributo-chave
             </Text>
             {gameClass.fixed_skills?.length ? (
               <Text variant="small" tone="secondary">
@@ -326,6 +359,39 @@ export default function NewCharacterScreen() {
                 Proficiências: {gameClass.proficiencies.join(', ').replace(/_/g, ' ')}
               </Text>
             ) : null}
+          </View>
+        </Card>
+      ) : null}
+
+      {gameClass ? (
+        <Card title="Atributo-chave" subtitle="Entra uma vez nos seus PM totais">
+          <View style={{ gap: spacing.md }}>
+            <HelpNote collapsible source="Livro base, p. 32">
+              Cada classe tem os atributos que mais importam para ela — Inteligência ou Carisma para o
+              arcanista, Sabedoria para o clérigo, Força para o bárbaro. O escolhido aqui é somado aos seus
+              pontos de mana. Os sugeridos pela classe vêm marcados, mas a mesa pode usar outro.
+            </HelpNote>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+              {ATTRIBUTE_ORDER.map((key) => {
+                const suggested = gameClass.key_attributes?.includes(key) ?? false;
+                const total = attributes[key] + (racialPreview[key] ?? 0);
+
+                return (
+                  <Chip
+                    key={key}
+                    label={`${ATTRIBUTE_LABELS[key].short} ${signed(total)}${suggested ? ' ★' : ''}`}
+                    selected={effectiveKeyAttribute === key}
+                    tone={suggested ? 'primary' : 'neutral'}
+                    onPress={() => setKeyAttribute(key)}
+                  />
+                );
+              })}
+            </View>
+
+            <Text variant="small" tone="secondary">
+              {mpPreview.label}
+            </Text>
           </View>
         </Card>
       ) : null}
