@@ -1,16 +1,17 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Platform, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, charactersApi } from '@/api';
 import type { AttributeKey, Character } from '@/api/types';
-import { Button, Card, ErrorState, Input, Loading, Screen, Select, Text } from '@/components/ui';
+import { Button, Card, Chip, ErrorState, HelpNote, Input, Loading, Screen, Select, Text } from '@/components/ui';
 import { PageHeader } from '@/components/layout';
 import { useCampaigns } from '@/hooks/useCampaigns';
 import { useCharacter, useDeleteCharacter, useUpdateCharacter } from '@/hooks/useCharacters';
 import { useReference } from '@/hooks/useReference';
-import { ATTRIBUTE_LABELS, ATTRIBUTE_ORDER } from '@/rules';
+import { ATTRIBUTE_LABELS, ATTRIBUTE_ORDER, signed } from '@/rules';
+import { prepararImagemParaUpload } from '@/utils/imagem';
 import { spacing } from '@/theme';
 
 /**
@@ -65,11 +66,43 @@ function EditForm({ character }: { character: Character }) {
         character.attributes.map((attribute) => [attribute.key, String(attribute.base)])
       ) as Record<AttributeKey, string>
   );
+  const [keyAttribute, setKeyAttribute] = useState<AttributeKey | null>(
+    character.key_attribute.selected
+  );
   const [classLevels, setClassLevels] = useState<Record<number, string>>(() =>
     Object.fromEntries(character.classes.map((entry) => [entry.game_class_id, String(entry.level)]))
   );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  /** Atributo-chave em uso: a escolha do jogador ou o herdado da classe. */
+  const effectiveKeyAttribute = keyAttribute ?? character.key_attribute.value;
+
+  /**
+   * Prévia dos PM com os níveis e atributos ainda em edição — o mesmo cálculo
+   * que o servidor refaz ao salvar: PM por nível de cada classe + atributo-chave.
+   */
+  const mpPreview = useMemo(() => {
+    const fromClasses = character.classes.reduce((total, entry) => {
+      const perLevel =
+        reference.data?.classes.find((c) => c.key === entry.key)?.mp_per_level ?? 0;
+      const level = Number.parseInt(classLevels[entry.game_class_id] ?? '1', 10) || 1;
+
+      return total + perLevel * level;
+    }, 0);
+
+    const bonus = effectiveKeyAttribute ? previewAttributeTotal(effectiveKeyAttribute) : 0;
+
+    return { total: Math.max(0, fromClasses + bonus), fromClasses, bonus };
+  }, [character.classes, reference.data?.classes, classLevels, effectiveKeyAttribute, attributes]);
+
+  /** Total de um atributo somando a base em edição às camadas já gravadas. */
+  function previewAttributeTotal(key: AttributeKey): number {
+    const gravado = character.attributes.find((entry) => entry.key === key);
+    const base = Number.parseInt(attributes[key] ?? '0', 10) || 0;
+
+    return base + ((gravado?.total ?? 0) - (gravado?.base ?? 0));
+  }
 
   const uploadAvatar = useMutation({
     mutationFn: async () => {
@@ -82,18 +115,20 @@ function EditForm({ character }: { character: Character }) {
 
       if (result.canceled || !result.assets[0]) return null;
 
-      const asset = result.assets[0];
+      // Reduzida antes de subir: o recorte do picker mantém as dimensões
+      // originais, e uma foto de celular estoura o limite de corpo do servidor.
+      const imagem = await prepararImagemParaUpload(result.assets[0], 'avatar');
       const formData = new FormData();
 
       if (Platform.OS === 'web') {
-        const response = await fetch(asset.uri);
+        const response = await fetch(imagem.uri);
         const blob = await response.blob();
-        formData.append('avatar', blob, asset.fileName ?? 'avatar.jpg');
+        formData.append('avatar', blob, imagem.name);
       } else {
         formData.append('avatar', {
-          uri: asset.uri,
-          name: asset.fileName ?? 'avatar.jpg',
-          type: asset.mimeType ?? 'image/jpeg',
+          uri: imagem.uri,
+          name: imagem.name,
+          type: imagem.type,
         } as never);
       }
 
@@ -128,6 +163,7 @@ function EditForm({ character }: { character: Character }) {
           ATTRIBUTE_ORDER.map((key) => [key, Number.parseInt(attributes[key] ?? '0', 10) || 0])
         ),
         racial_attribute_choices: character.racial_attribute_choices ?? undefined,
+        key_attribute: keyAttribute,
         classes: character.classes.map((entry) => ({
           game_class_id: entry.game_class_id,
           level: Number.parseInt(classLevels[entry.game_class_id] ?? '1', 10) || 1,
@@ -243,6 +279,48 @@ function EditForm({ character }: { character: Character }) {
               keyboardType="numbers-and-punctuation"
             />
           ))}
+        </View>
+      </Card>
+
+      <Card title="Atributo-chave" subtitle="Somado uma vez aos seus PM totais">
+        <View style={{ gap: spacing.md }}>
+          <HelpNote collapsible source="Livro base, p. 32">
+            Cada classe tem seus atributos-chave — Inteligência ou Carisma para o arcanista, Sabedoria para o
+            clérigo, Força para o bárbaro. Os sugeridos pela classe aparecem com ★, mas você pode escolher
+            qualquer um.
+          </HelpNote>
+
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+            {ATTRIBUTE_ORDER.map((key) => {
+              const suggested = character.key_attribute.suggested.includes(key);
+
+              return (
+                <Chip
+                  key={key}
+                  label={`${ATTRIBUTE_LABELS[key].short} ${signed(previewAttributeTotal(key))}${suggested ? ' ★' : ''}`}
+                  selected={effectiveKeyAttribute === key}
+                  tone={suggested ? 'primary' : 'neutral'}
+                  onPress={() => setKeyAttribute(key)}
+                />
+              );
+            })}
+          </View>
+
+          <Text variant="small" tone="secondary">
+            PM totais: {mpPreview.fromClasses} das classes
+            {effectiveKeyAttribute
+              ? `, ${ATTRIBUTE_LABELS[effectiveKeyAttribute].full} ${signed(mpPreview.bonus)}`
+              : ''}{' '}
+            → {mpPreview.total}
+          </Text>
+
+          {keyAttribute !== null && character.key_attribute.suggested.length > 0 ? (
+            <Button
+              label="Voltar ao atributo da classe"
+              variant="secondary"
+              onPress={() => setKeyAttribute(null)}
+            />
+          ) : null}
         </View>
       </Card>
 

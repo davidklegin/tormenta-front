@@ -84,6 +84,21 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+/**
+ * Mensagem para os erros que não vêm do Laravel.
+ *
+ * O 413 é o caso concreto: quem responde é o nginx, com uma página HTML, sem
+ * `message` nenhum. Sem isto o usuário lê "Erro 413 ao falar com o servidor" e
+ * não tem como adivinhar que o problema é o tamanho do arquivo.
+ */
+function mensagemPadrao(status: number): string {
+  if (status === 413) {
+    return 'O arquivo é grande demais para o servidor aceitar. Escolha uma imagem menor.';
+  }
+
+  return `Erro ${status} ao falar com o servidor.`;
+}
+
 function buildQuery(query: RequestOptions['query']): string {
   if (!query) return '';
 
@@ -161,7 +176,7 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
     }
 
     throw new ApiError(
-      payload.message ?? `Erro ${response.status} ao falar com o servidor.`,
+      payload.message ?? mensagemPadrao(response.status),
       response.status,
       payload.errors ?? {},
       data

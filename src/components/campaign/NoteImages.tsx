@@ -6,6 +6,7 @@ import { useMutation } from '@tanstack/react-query';
 import { campaignsApi } from '@/api';
 import type { CampaignNoteImage } from '@/api/types';
 import { Button, Icon, Text } from '@/components/ui';
+import { prepararImagemParaUpload } from '@/utils/imagem';
 import { radius, spacing, stroke, useTheme } from '@/theme';
 
 /**
@@ -23,7 +24,14 @@ export type PendingNoteImage = {
 
 let sequencia = 0;
 
-/** Abre a galeria e devolve o que foi escolhido, já no formato do upload. */
+/**
+ * Abre a galeria e devolve o que foi escolhido, já reduzido e no formato do
+ * upload.
+ *
+ * O `quality` do picker só reencoda; não mexe nas dimensões. Uma foto de
+ * celular continuaria saindo com 4000 px e vários MB — e morreria no 413 do
+ * nginx antes de chegar ao Laravel. Quem encolhe de verdade é o preparo.
+ */
 export async function pickNoteImages(): Promise<PendingNoteImage[]> {
   const resultado = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
@@ -34,12 +42,12 @@ export async function pickNoteImages(): Promise<PendingNoteImage[]> {
 
   if (resultado.canceled) return [];
 
-  return resultado.assets.map((asset) => ({
-    key: `pendente-${(sequencia += 1)}`,
-    uri: asset.uri,
-    name: asset.fileName ?? 'imagem.jpg',
-    type: asset.mimeType ?? 'image/jpeg',
-  }));
+  return Promise.all(
+    resultado.assets.map(async (asset) => ({
+      key: `pendente-${(sequencia += 1)}`,
+      ...(await prepararImagemParaUpload(asset, 'imagem')),
+    }))
+  );
 }
 
 /**
