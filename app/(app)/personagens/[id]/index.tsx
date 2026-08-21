@@ -5,7 +5,6 @@ import { charactersApi } from '@/api';
 import type { Character } from '@/api/types';
 import { Button, Card, HelpNote, Icon, Text } from '@/components/ui';
 import { AttackManager } from '@/components/character/AttackManager';
-import { AttributeGrid } from '@/components/character/AttributeGrid';
 import { ConditionManager } from '@/components/character/ConditionManager';
 import { ResourceManager } from '@/components/character/ResourceManager';
 import { SheetScreen } from '@/components/character/SheetScreen';
@@ -18,8 +17,9 @@ import { spacing, useResponsive, useTheme, vitalColors } from '@/theme';
  * Aba Combate — o que se usa durante a sessão (briefing §19).
  *
  * A ordem segue a frequência de uso na mesa: primeiro vida e mana, que mudam a
- * cada turno; depois condições; então atributos e ataques, consultados a cada
- * rolagem; por último carga e experiência, que quase não mudam durante o jogo.
+ * cada turno; depois condições e ataques; por último carga e experiência, que
+ * quase não mudam durante o jogo. Os atributos ficam no cabeçalho da ficha,
+ * onde valem para todas as abas.
  */
 export default function CharacterOverviewScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -120,10 +120,6 @@ function CombatContent({ characterId, character }: { characterId: number; charac
       <ConditionManager characterId={characterId} conditions={character.conditions} editable={podeAlterar} />
 
       <ResourceManager characterId={characterId} resources={character.resources} editable={podeAlterar} />
-
-      <Card title="Atributos" subtitle="O número já é o modificador que entra nas rolagens">
-        <AttributeGrid attributes={character.attributes} />
-      </Card>
 
       <AttackManager
         characterId={characterId}

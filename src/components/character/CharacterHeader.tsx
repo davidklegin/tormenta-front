@@ -1,17 +1,31 @@
 import { Image } from 'expo-image';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { Button, Chip, Seal, Text } from '@/components/ui';
+import { Button, Chip, Text } from '@/components/ui';
 import type { Character } from '@/api/types';
 import { radius, spacing, stroke, useResponsive, useTheme } from '@/theme';
+import { AttributeGrid } from './AttributeGrid';
 
 /**
  * Cabeçalho da ficha: identidade e o que o jogador mais consulta —
- * Defesa, deslocamento e CD de magia.
+ * atributos, raça/classe/origem, Defesa, deslocamento e CD de magia.
+ *
+ * Os atributos vêm logo abaixo do nome porque são o que se olha em toda
+ * rolagem, em qualquer aba. Raça, classe, origem, divindade e nível ficam
+ * rotulados no mesmo desenho dos números da faixa: numa lista separada por
+ * pontos, "Suraggel" e "Nobre" viram uma linha só que ninguém lê.
  */
 export function CharacterHeader({ character }: { character: Character }) {
   const { isPhone } = useResponsive();
   const { colors } = useTheme();
+
+  const identidade = [
+    { label: 'Raça', value: character.race?.name },
+    { label: 'Classe', value: character.class_label },
+    { label: 'Origem', value: character.origin?.name },
+    { label: 'Divindade', value: character.deity?.name },
+    { label: 'Nível', value: String(character.level) },
+  ].filter((item): item is { label: string; value: string } => Boolean(item.value));
 
   return (
     <View style={{ gap: spacing.md }}>
@@ -47,24 +61,11 @@ export function CharacterHeader({ character }: { character: Character }) {
           <Text variant={isPhone ? 'title' : 'display'} numberOfLines={1}>
             {character.name}
           </Text>
-          <Text variant="small" tone="secondary" numberOfLines={2}>
-            {[character.race?.name, character.class_label, character.origin?.name]
-              .filter(Boolean)
-              .join(' · ')}
-          </Text>
           <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
             <Chip label={character.progression.tier} tone="neutral" compact />
-            {character.deity ? <Chip label={character.deity.name} tone="arcane" compact /> : null}
             {character.campaign ? <Chip label={character.campaign.name} tone="neutral" compact /> : null}
           </View>
         </View>
-
-        <Seal
-          value={character.level}
-          tone="gold"
-          size={isPhone ? 'md' : 'lg'}
-          accessibilityLabel={`Nível ${character.level}`}
-        />
 
         {character.permissions.can_update ? (
           <Button
@@ -74,6 +75,20 @@ export function CharacterHeader({ character }: { character: Character }) {
             onPress={() => router.push(`/(app)/personagens/${character.id}/editar`)}
           />
         ) : null}
+      </View>
+
+      {/* Os seis atributos, logo abaixo do nome */}
+      <AttributeGrid attributes={character.attributes} />
+
+      {/* Quem é o personagem, rotulado */}
+      <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
+        {identidade.map((item) => (
+          <Tile key={item.label} label={item.label}>
+            <Text variant="bodyStrong" numberOfLines={1}>
+              {item.value}
+            </Text>
+          </Tile>
+        ))}
       </View>
 
       {/* Faixa de valores consultados o tempo todo */}
@@ -91,20 +106,17 @@ export function CharacterHeader({ character }: { character: Character }) {
   );
 }
 
-function StatTile({
+/** Moldura das faixas do cabeçalho: rótulo em versalete e o valor embaixo. */
+function Tile({
   label,
-  value,
   highlight = false,
-  tone = 'default',
+  children,
 }: {
   label: string;
-  value: string | number;
   highlight?: boolean;
-  tone?: 'default' | 'warning';
+  children: React.ReactNode;
 }) {
   const { colors } = useTheme();
-
-  const color = tone === 'warning' ? colors.warningInk : highlight ? colors.primaryInk : colors.text;
 
   return (
     <View
@@ -125,9 +137,31 @@ function StatTile({
       <Text variant="caption" tone="secondary" uppercase>
         {label}
       </Text>
+      {children}
+    </View>
+  );
+}
+
+function StatTile({
+  label,
+  value,
+  highlight = false,
+  tone = 'default',
+}: {
+  label: string;
+  value: string | number;
+  highlight?: boolean;
+  tone?: 'default' | 'warning';
+}) {
+  const { colors } = useTheme();
+
+  const color = tone === 'warning' ? colors.warningInk : highlight ? colors.primaryInk : colors.text;
+
+  return (
+    <Tile label={label} highlight={highlight}>
       <Text variant="numeric" style={{ color, fontSize: 22 }}>
         {value}
       </Text>
-    </View>
+    </Tile>
   );
 }
