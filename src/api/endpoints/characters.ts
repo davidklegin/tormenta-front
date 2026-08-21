@@ -190,6 +190,15 @@ export const charactersApi = {
     }).then((r) => r.data),
   removeSpell: (id: number, spellId: number) =>
     apiRequest<{ message: string }>(`/characters/${id}/spells/${spellId}`, { method: 'DELETE' }),
+  /**
+   * Adiciona de uma vez as magias marcadas na biblioteca. O backend ignora as
+   * que o personagem já conhece e devolve quantas entraram e quantas pulou.
+   */
+  importSpells: (id: number, spellIds: number[]) =>
+    apiRequest<{ data: CharacterSpell[]; added: number; skipped: number }>(
+      `/characters/${id}/spells/import`,
+      { method: 'POST', body: { spell_ids: spellIds } }
+    ),
 
   // --- habilidades de classe ---
   classAbilities: (id: number) =>

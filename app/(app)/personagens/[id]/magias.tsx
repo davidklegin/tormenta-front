@@ -3,9 +3,10 @@ import { Pressable, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { charactersApi } from '@/api';
-import type { Character, CharacterSpell } from '@/api/types';
-import { Button, Card, Chip, HelpNote, Input, SegmentedControl, Select, Sheet, Text } from '@/components/ui';
+import type { Character, CharacterSpell, SpellTradition } from '@/api/types';
+import { Button, Card, Chip, HelpNote, Input, SegmentedControl, Select, Sheet, Text, Toast } from '@/components/ui';
 import { SheetScreen } from '@/components/character/SheetScreen';
+import { SpellCatalogSheet } from '@/components/character/SpellCatalogSheet';
 import { useReference } from '@/hooks/useReference';
 import { SPELL_CIRCLE_COST } from '@/rules';
 import { radius, spacing, useTheme } from '@/theme';
@@ -30,6 +31,7 @@ export default function SpellsScreen() {
 
 function SpellsContent({ characterId, character }: { characterId: number; character: Character }) {
   const { colors } = useTheme();
+  const reference = useReference();
 
   const queryClient = useQueryClient();
   const canEdit = character.permissions.can_update;
@@ -39,6 +41,8 @@ function SpellsContent({ characterId, character }: { characterId: number; charac
   const [detail, setDetail] = useState<CharacterSpell | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CharacterSpell | null>(null);
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['character', characterId] });
@@ -71,6 +75,30 @@ function SpellsContent({ characterId, character }: { characterId: number; charac
 
     return [...groups.entries()].sort((a, b) => a[0] - b[0]);
   }, [filtered]);
+
+  /** Magias vindas da biblioteca: o grimório as mostra marcadas. */
+  const knownSpellIds = useMemo(
+    () => character.spells.map((spell) => spell.spell_id).filter((id): id is number => id !== null),
+    [character.spells]
+  );
+
+  /**
+   * Tradição da classe conjuradora, para o grimório já abrir filtrado — quem
+   * joga de clérigo não quer rolar 128 magias arcanas antes das divinas. A
+   * ficha guarda só o vínculo com a classe, então a tradição vem do catálogo.
+   */
+  const suggestedTradition = useMemo<SpellTradition | null>(() => {
+    const catalogo = reference.data?.classes ?? [];
+    const daClasse = character.classes
+      .map((entry) => catalogo.find((c) => c.id === entry.game_class_id)?.spell_tradition)
+      .find((tradition) => tradition === 'arcana' || tradition === 'divina');
+
+    if (daClasse) return daClasse as SpellTradition;
+
+    const daFicha = character.spells[0]?.tradition;
+
+    return daFicha === 'arcana' || daFicha === 'divina' ? daFicha : null;
+  }, [reference.data, character.classes, character.spells]);
 
   const circleCounts = useMemo(() => {
     const counts: Record<number, number> = {};
@@ -126,13 +154,22 @@ function SpellsContent({ characterId, character }: { characterId: number; charac
       />
 
       {canEdit ? (
-        <Button
-          label="Adicionar magia"
-          onPress={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-        />
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <Button
+            label="Buscar no grimório"
+            onPress={() => setCatalogOpen(true)}
+            style={{ flex: 1 }}
+          />
+          <Button
+            label="Criar do zero"
+            variant="secondary"
+            onPress={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+            style={{ flex: 1 }}
+          />
+        </View>
       ) : null}
 
       {byCircle.length === 0 ? (
@@ -264,6 +301,19 @@ function SpellsContent({ characterId, character }: { characterId: number; charac
         spell={editing}
         onSaved={invalidate}
       />
+
+      <SpellCatalogSheet
+        visible={catalogOpen}
+        onClose={() => setCatalogOpen(false)}
+        characterId={characterId}
+        knownSpellIds={knownSpellIds}
+        suggestedTradition={suggestedTradition}
+        onImported={(added) =>
+          setAviso(added === 1 ? 'Magia adicionada à ficha.' : `${added} magias adicionadas à ficha.`)
+        }
+      />
+
+      {aviso ? <Toast message={aviso} tone="success" onDismiss={() => setAviso(null)} /> : null}
     </View>
   );
 }

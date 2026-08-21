@@ -200,11 +200,73 @@ export type CharacterPower = {
   description: string | null;
 };
 
+/** Magia na biblioteca — o resumo que a lista do grimório exibe. */
+export type CatalogSpell = {
+  id: number;
+  key: string;
+  name: string;
+  tradition: SpellTradition;
+  circle: number;
+  school: string;
+  school_label: string;
+  header: string;
+  execution: string | null;
+  range_text: string | null;
+  /** Alvo, Área ou Efeito — o livro traz só um dos três por magia. */
+  target_label: string | null;
+  mp_cost: number;
+  /** Publicação de origem: Edição Jogo do Ano, Deuses de Arton, Dragão Brasil… */
+  source: string | null;
+};
+
+/** Ficha completa da magia na biblioteca. */
+export type CatalogSpellDetail = CatalogSpell & {
+  target: string | null;
+  area: string | null;
+  effect: string | null;
+  duration: string | null;
+  resistance: string | null;
+  description: string;
+  enhancements: SpellEnhancement[];
+};
+
+export type SpellSearch = {
+  q?: string;
+  circle?: number;
+  tradition?: SpellTradition;
+  school?: string;
+  source?: string;
+  page?: number;
+  per_page?: number;
+};
+
+export type SpellCatalogFilters = {
+  traditions: { value: SpellTradition; label: string }[];
+  schools: { value: string; label: string; abbreviation: string }[];
+  sources: string[];
+  total: number;
+};
+
+/**
+ * Magias universais valem para conjuradores arcanos e divinos (livro base,
+ * p. 170), por isso são um tipo próprio e não uma variação dos outros dois.
+ */
+export type SpellTradition = 'arcana' | 'divina' | 'universal';
+
+export type SpellEnhancement = {
+  cost: string;
+  text: string;
+  /** Custo em PM já isolado do rótulo; 0 para aprimoramentos como "Truque". */
+  mp?: number;
+  /** Restrição do aprimoramento, quando existe: "Apenas Devotos de Marah". */
+  requirement?: string | null;
+};
+
 export type CharacterSpell = {
   id: number;
   spell_id: number | null;
   name: string;
-  tradition: 'arcana' | 'divina';
+  tradition: SpellTradition;
   circle: number;
   school: string | null;
   school_label: string | null;
@@ -218,7 +280,7 @@ export type CharacterSpell = {
   resistance: string | null;
   mp_cost: number;
   description: string | null;
-  enhancements: { cost: string; text: string }[];
+  enhancements: SpellEnhancement[];
   is_favorite: boolean;
 };
 
