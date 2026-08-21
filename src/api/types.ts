@@ -22,6 +22,13 @@ export type User = {
   name: string;
   nickname: string | null;
   email?: string;
+  /**
+   * Permissão MASTER da plataforma: acesso a todas as campanhas e fichas.
+   *
+   * Só vem preenchida para o próprio usuário (como o e-mail). Não confundir
+   * com `Campaign.is_master`, que é o papel de mestre daquela mesa.
+   */
+  is_master?: boolean;
   bio: string | null;
   avatar_url: string | null;
   created_at: string | null;

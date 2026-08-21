@@ -5,7 +5,7 @@ import { ApiError } from '@/api';
 import type { AttributeKey } from '@/api/types';
 import { Button, Card, Chip, HelpNote, Input, Loading, Screen, Select, Text } from '@/components/ui';
 import { PageHeader } from '@/components/layout';
-import { useCampaigns } from '@/hooks/useCampaigns';
+import { useLinkableCampaigns } from '@/hooks/useCampaigns';
 import { useCreateCharacter } from '@/hooks/useCharacters';
 import { useReference } from '@/hooks/useReference';
 import { ATTRIBUTE_LABELS, ATTRIBUTE_ORDER, signed } from '@/rules';
@@ -20,7 +20,7 @@ import { radius, spacing, useTheme } from '@/theme';
  */
 export default function NewCharacterScreen() {
   const reference = useReference();
-  const campaigns = useCampaigns();
+  const campaigns = useLinkableCampaigns();
   const createCharacter = useCreateCharacter();
 
   const [name, setName] = useState('');
@@ -291,7 +291,7 @@ export default function NewCharacterScreen() {
             options={(campaigns.data ?? []).map((entry) => ({ value: entry.id, label: entry.name }))}
             onChange={setCampaignId}
             clearable
-            hint="Você pode vincular depois, na ficha."
+            hint="Qualquer mesa serve, e dá para vincular depois, na ficha."
           />
         </View>
       </Card>

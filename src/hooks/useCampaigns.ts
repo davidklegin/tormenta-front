@@ -24,16 +24,38 @@ export function useCampaigns() {
 /**
  * O catálogo aberto: todas as mesas, de todo mundo.
  *
- * Usa `scope=all` e não `public` porque a leitura é aberta
- * (CampaignPolicy::view) — mesa privada aparece aqui, só não tem entrada
- * livre. A busca vai ao servidor porque o catálogo devolve as mais recentes, e
- * não a base inteira — é assim que se acha uma campanha antiga.
+ * Usa `scope=all` e não `public` porque as mesas são abertas a todos — a
+ * privada aparece aqui do mesmo jeito; o que ela não tem é vitrine própria. A
+ * busca vai ao servidor porque o catálogo devolve as mais recentes, e não a
+ * base inteira — é assim que se acha uma campanha antiga.
  */
-export function usePublicCampaigns(q = '') {
+export function useCampaignCatalog(q = '') {
   return useQuery<Campaign[]>({
     queryKey: campaignKeys.catalog(q),
     queryFn: () => campaignsApi.list({ scope: 'all', q: q || undefined }),
   });
+}
+
+/**
+ * As mesas que o seletor da ficha oferece: qualquer uma serve.
+ *
+ * Vincular é livre, então a lista é o catálogo inteiro. As minhas entram por
+ * cima porque o catálogo devolve só as mais recentes da base — sem isso, uma
+ * mesa antiga em que jogo poderia não aparecer na própria ficha.
+ */
+export function useLinkableCampaigns() {
+  const minhas = useCampaigns();
+  const catalogo = useCampaignCatalog();
+
+  const vistas = new Set<number>();
+  const campaigns = [...(minhas.data ?? []), ...(catalogo.data ?? [])].filter((campaign) => {
+    if (vistas.has(campaign.id)) return false;
+    vistas.add(campaign.id);
+
+    return true;
+  });
+
+  return { data: campaigns, isLoading: minhas.isLoading || catalogo.isLoading };
 }
 
 export function useCampaign(id: number | null | undefined) {

@@ -7,7 +7,7 @@ import { ApiError, charactersApi } from '@/api';
 import type { AttributeKey, Character } from '@/api/types';
 import { Button, Card, Chip, ErrorState, HelpNote, Input, Loading, Screen, Select, Text } from '@/components/ui';
 import { PageHeader } from '@/components/layout';
-import { useCampaigns } from '@/hooks/useCampaigns';
+import { useLinkableCampaigns } from '@/hooks/useCampaigns';
 import { useCharacter, useDeleteCharacter, useUpdateCharacter } from '@/hooks/useCharacters';
 import { useReference } from '@/hooks/useReference';
 import { ATTRIBUTE_LABELS, ATTRIBUTE_ORDER, signed } from '@/rules';
@@ -48,7 +48,7 @@ export default function EditCharacterScreen() {
 function EditForm({ character }: { character: Character }) {
   const queryClient = useQueryClient();
   const reference = useReference();
-  const campaigns = useCampaigns();
+  const campaigns = useLinkableCampaigns();
   const updateCharacter = useUpdateCharacter(character.id);
   const deleteCharacter = useDeleteCharacter();
 
@@ -225,6 +225,7 @@ function EditForm({ character }: { character: Character }) {
             options={(campaigns.data ?? []).map((entry) => ({ value: entry.id, label: entry.name }))}
             onChange={setCampaignId}
             clearable
+            hint="Qualquer mesa serve — você não precisa participar dela para levar a ficha."
           />
 
           <Select

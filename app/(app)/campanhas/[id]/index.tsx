@@ -151,7 +151,7 @@ export default function CampaignScreen() {
 
       {/* Visibilidade: quem decide se a mesa fica no catálogo é o mestre */}
       {isMaster ? (
-        <Card title="Visibilidade" subtitle="Quem enxerga esta campanha">
+        <Card title="Visibilidade" subtitle="Quem encontra esta campanha">
           <View style={{ gap: spacing.md }}>
             <SegmentedControl
               value={data.visibility}
@@ -163,8 +163,8 @@ export default function CampaignScreen() {
             />
             <Text variant="caption" tone="muted">
               {data.visibility === 'public'
-                ? 'Qualquer jogador entra com um toque, sem código. O Painel do Mestre e as anotações marcadas "somente o mestre" continuam só seus.'
-                : 'A mesa continua à vista da comunidade, em leitura — o que muda é a entrada: só entra quem tiver o código de convite. O Painel do Mestre e as anotações marcadas "somente o mestre" continuam só seus.'}
+                ? 'A mesa aparece no catálogo, e qualquer jogador entra com um toque. O Painel do Mestre e as anotações marcadas "somente o mestre" continuam só seus.'
+                : 'A mesa sai do catálogo: chega só a quem você mandar o link ou o código. Quem chegar entra do mesmo jeito — as mesas são abertas. O Painel do Mestre e as anotações marcadas "somente o mestre" continuam só seus.'}
             </Text>
           </View>
         </Card>

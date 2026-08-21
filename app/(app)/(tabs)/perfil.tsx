@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
 import { ApiError, authApi } from '@/api';
-import { Button, Card, Input, Screen, Text } from '@/components/ui';
+import { Button, Card, Chip, Input, Screen, Text } from '@/components/ui';
 import { PageHeader } from '@/components/layout';
 import { closeRealtime } from '@/realtime/useCampaignChannel';
 import { useAuthStore } from '@/store/auth';
@@ -89,7 +89,22 @@ export default function ProfileScreen() {
 
   return (
     <Screen insideTabs contentStyle={{ maxWidth: 720 }}>
-      <PageHeader title="Perfil" subtitle={user?.email ?? undefined} />
+      <PageHeader
+        title="Perfil"
+        subtitle={user?.email ?? undefined}
+        actions={user?.is_master ? <Chip label="MASTER" tone="gold" /> : undefined}
+      />
+
+      {/* A permissão MASTER é global e silenciosa: sem este aviso, o usuário
+          veria botões de mestre em mesas alheias sem entender por quê. */}
+      {user?.is_master ? (
+        <Card title="Permissão MASTER">
+          <Text variant="small" tone="secondary">
+            Sua conta administra a plataforma inteira: você abre, edita e exclui qualquer campanha e
+            qualquer ficha, enxerga o Painel do Mestre e as anotações privadas de todas as mesas.
+          </Text>
+        </Card>
+      ) : null}
 
       <Card title="Seus dados">
         <View style={{ gap: spacing.md }}>

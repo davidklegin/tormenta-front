@@ -20,9 +20,8 @@ import { PageHeader, ResponsiveGrid } from '@/components/layout';
 import {
   useCampaigns,
   useCreateCampaign,
-  useJoinCampaign,
   useJoinPublicCampaign,
-  usePublicCampaigns,
+  useCampaignCatalog,
 } from '@/hooks/useCampaigns';
 import { spacing, useTheme } from '@/theme';
 
@@ -31,9 +30,9 @@ type Aba = 'minhas' | 'todas';
 /**
  * Campanhas: as minhas e as de todo mundo (briefing §16).
  *
- * A leitura é aberta, então a tela tem duas listas. "Minhas" é onde se joga;
- * "Todas" é a base inteira — mesas públicas, de onde se entra com um toque, e
- * fechadas, que se lê mas só se entra com o código do mestre.
+ * As mesas são abertas a todos, então a tela tem duas listas. "Minhas" é onde
+ * se joga; "Todas" é a base inteira — de qualquer uma delas se entra com um
+ * toque. A visibilidade só decide quem se anuncia no catálogo.
  */
 export default function CampaignsScreen() {
   const { colors } = useTheme();
@@ -42,16 +41,13 @@ export default function CampaignsScreen() {
   const [busca, setBusca] = useState('');
 
   const campaigns = useCampaigns();
-  const catalogo = usePublicCampaigns(aba === 'todas' ? busca.trim() : '');
+  const catalogo = useCampaignCatalog(aba === 'todas' ? busca.trim() : '');
   const createCampaign = useCreateCampaign();
-  const joinCampaign = useJoinCampaign();
   const joinPublic = useJoinPublicCampaign();
 
   const [createOpen, setCreateOpen] = useState(false);
-  const [joinOpen, setJoinOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [code, setCode] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
 
   const lista = aba === 'minhas' ? campaigns : catalogo;
@@ -78,28 +74,6 @@ export default function CampaignsScreen() {
     }
   }
 
-  async function handleJoin() {
-    if (code.trim().length !== 8) {
-      setFormError('O código de convite tem 8 caracteres.');
-
-      return;
-    }
-
-    setFormError(null);
-    try {
-      const result = await joinCampaign.mutateAsync(code.trim().toUpperCase());
-      setJoinOpen(false);
-      setCode('');
-      router.push(`/(app)/campanhas/${result.campaign.id}`);
-    } catch (error) {
-      setFormError(
-        error instanceof ApiError
-          ? (error.fieldError('code') ?? error.message)
-          : 'Não foi possível entrar na campanha.'
-      );
-    }
-  }
-
   return (
     <Screen
       insideTabs
@@ -114,17 +88,7 @@ export default function CampaignsScreen() {
       <PageHeader
         title="Campanhas"
         subtitle={aba === 'minhas' ? 'Mesas das quais você participa' : 'Todas as mesas da comunidade'}
-        actions={
-          <>
-            <Button
-              label="Entrar com código"
-              variant="secondary"
-              size="sm"
-              onPress={() => setJoinOpen(true)}
-            />
-            <Button label="Criar campanha" size="sm" onPress={() => setCreateOpen(true)} />
-          </>
-        }
+        actions={<Button label="Criar campanha" size="sm" onPress={() => setCreateOpen(true)} />}
       />
 
       <SegmentedControl
@@ -205,44 +169,8 @@ export default function CampaignsScreen() {
           placeholder="Do que se trata a campanha?"
         />
         <Text variant="small" tone="muted">
-          A mesa nasce pública: qualquer jogador pode entrar com um toque. Você fecha quando quiser,
-          na tela da campanha — fechada, ela continua à vista, mas só entra quem tiver o código.
-        </Text>
-        {formError ? (
-          <Text variant="small" tone="danger">
-            {formError}
-          </Text>
-        ) : null}
-      </Sheet>
-
-      <Sheet
-        visible={joinOpen}
-        onClose={() => setJoinOpen(false)}
-        title="Entrar em uma campanha"
-        subtitle="Peça o código de 8 caracteres ao mestre"
-        footer={
-          <>
-            <Button label="Cancelar" variant="ghost" onPress={() => setJoinOpen(false)} style={{ flex: 1 }} />
-            <Button
-              label="Entrar"
-              onPress={handleJoin}
-              loading={joinCampaign.isPending}
-              style={{ flex: 1 }}
-            />
-          </>
-        }
-      >
-        <Input
-          label="Código de convite"
-          value={code}
-          onChangeText={(text) => setCode(text.toUpperCase())}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={8}
-          placeholder="ABCD1234"
-        />
-        <Text variant="small" tone="muted">
-          O código é o caminho para as mesas fechadas. As abertas você acha na aba Todas.
+          A mesa nasce pública e qualquer jogador entra com um toque. Você pode tirá-la do catálogo
+          quando quiser, na tela da campanha — aí ela só chega a quem você mandar o link ou o código.
         </Text>
         {formError ? (
           <Text variant="small" tone="danger">
@@ -288,7 +216,11 @@ function CampanhaCard({
               compact
             />
           ) : (
-            <Chip label={campaign.visibility === 'private' ? 'Fechada' : 'Aberta'} tone="neutral" compact />
+            <Chip
+              label={campaign.visibility === 'private' ? 'Fora do catálogo' : 'Aberta'}
+              tone="neutral"
+              compact
+            />
           )}
         </View>
 
