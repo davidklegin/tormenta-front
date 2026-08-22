@@ -1,11 +1,17 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { charactersApi } from '@/api';
-import type { Character, CharacterNote } from '@/api/types';
+import type { Character, CharacterNote, NoteAttachment } from '@/api/types';
 import { Button, Card, EmptyState, Input, Loading, Sheet, Text, Icon } from '@/components/ui';
 import { SheetScreen } from '@/components/character/SheetScreen';
+import {
+  AttachmentStrip,
+  NoteAttachments,
+  buildAttachmentForm,
+  type PendingAttachment,
+} from '@/components/files';
 import { radius, spacing, useTheme } from '@/theme';
 
 /**
@@ -120,6 +126,8 @@ function NotesContent({ characterId, character }: { characterId: number; charact
                 </Text>
               ) : null}
 
+              <AttachmentStrip attachments={note.attachments ?? []} size={48} />
+
               <Text variant="small" tone="muted">
                 Atualizada em {formatDate(note.updated_at)}
               </Text>
@@ -133,7 +141,10 @@ function NotesContent({ characterId, character }: { characterId: number; charact
         visible={formOpen}
         onClose={() => setFormOpen(false)}
         characterId={characterId}
-        note={editing}
+        /* A versão recém-carregada, e não a que abriu o formulário: anexar um
+           arquivo recarrega a lista, e é dali que sai o que o visualizador
+           mostra. */
+        note={editing ? ((notes.data ?? []).find((n) => n.id === editing.id) ?? editing) : null}
         onSaved={() => void queryClient.invalidateQueries({ queryKey: ['character', characterId, 'notes'] })}
       />
     </View>
@@ -159,34 +170,116 @@ function NoteForm({
   const [body, setBody] = useState(note?.body ?? '');
   const [pinned, setPinned] = useState(note?.pinned ?? false);
 
+  // Arquivos escolhidos antes de a anotação existir — sobem depois do create.
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+
+  // Se o create passou mas um upload falhou, a anotação já existe: um segundo
+  // "Salvar" precisa editá-la e retentar os arquivos, nunca criar outra.
+  const criada = useRef<CharacterNote | null>(null);
+  const alvo = note ?? criada.current;
+
+  /** Sair descarta o que ainda não subiu — e desfaz o vínculo com o que foi criado. */
+  function fechar() {
+    criada.current = null;
+    setPending([]);
+    setAttachmentError(null);
+    onClose();
+  }
+
   const save = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const payload = { title: title.trim(), body: body.trim(), pinned };
 
-      return note
-        ? charactersApi.updateNote(characterId, note.id, payload)
-        : charactersApi.createNote(characterId, payload);
+      const salva = alvo
+        ? await charactersApi.updateNote(characterId, alvo.id, payload)
+        : await charactersApi.createNote(characterId, payload);
+
+      if (!note) criada.current = salva;
+
+      if (pending.length === 0) return true;
+
+      const restantes: PendingAttachment[] = [];
+      const enviados: NoteAttachment[] = [];
+
+      for (const arquivo of pending) {
+        try {
+          enviados.push(
+            await charactersApi.addNoteAttachment(characterId, salva.id, await buildAttachmentForm(arquivo))
+          );
+        } catch {
+          restantes.push(arquivo);
+        }
+      }
+
+      // A nota que acabou de nascer não conhece os anexos dela: sem isto, um
+      // envio parcial esconderia da lista o que já subiu.
+      if (criada.current) {
+        criada.current = {
+          ...criada.current,
+          attachments: [...(criada.current.attachments ?? []), ...enviados],
+        };
+      }
+
+      setPending(restantes);
+
+      return restantes.length === 0;
     },
-    onSuccess: () => {
+    onSuccess: (completo) => {
       onSaved();
-      onClose();
+
+      if (completo) {
+        fechar();
+
+        return;
+      }
+
+      setAttachmentError(
+        'A anotação foi salva, mas não conseguimos enviar todos os arquivos. Tente salvar de novo.'
+      );
     },
   });
 
   return (
     <Sheet
       visible={visible}
-      onClose={onClose}
+      onClose={fechar}
       title={note ? 'Editar anotação' : 'Nova anotação'}
       footer={
         <>
-          <Button label="Cancelar" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
+          <Button label="Cancelar" variant="ghost" onPress={fechar} style={{ flex: 1 }} />
           <Button label="Salvar" onPress={() => save.mutate()} loading={save.isPending} style={{ flex: 1 }} />
         </>
       }
     >
       <Input label="Título" value={title} onChangeText={setTitle} placeholder="O que aconteceu na sessão" />
       <Input label="Texto" value={body} onChangeText={setBody} multiline />
+
+      <View style={{ gap: spacing.sm }}>
+        <Text variant="smallStrong" tone="secondary">
+          Arquivos
+        </Text>
+
+        {/* Sem anotação salva ainda, as escolhas ficam em espera e sobem junto
+            com o "Salvar". */}
+        <NoteAttachments
+          attachments={alvo?.attachments ?? []}
+          editable
+          onUpload={alvo ? (form) => charactersApi.addNoteAttachment(characterId, alvo.id, form) : undefined}
+          onRemove={
+            alvo ? (anexo) => charactersApi.removeNoteAttachment(characterId, alvo.id, anexo.id) : undefined
+          }
+          onChanged={onSaved}
+          pending={pending}
+          onPendingChange={setPending}
+        />
+
+        {attachmentError ? (
+          <Text variant="small" tone="danger">
+            {attachmentError}
+          </Text>
+        ) : null}
+      </View>
 
       <Pressable
         onPress={() => setPinned((value) => !value)}

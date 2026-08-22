@@ -1,5 +1,6 @@
 export {
   ApiError,
+  apiFetchRaw,
   apiRequest,
   apiUpload,
   getApiBaseUrl,

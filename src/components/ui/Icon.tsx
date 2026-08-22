@@ -52,6 +52,18 @@ const GLYPHS = {
   mais: 'plus',
   menos: 'minus',
 
+  // Anexos — um por forma de exibição (ver AttachmentKind na API)
+  arquivo: 'file-outline',
+  arquivoImagem: 'file-image-outline',
+  arquivoPdf: 'file-pdf-box',
+  arquivoVideo: 'file-video-outline',
+  arquivoAudio: 'file-music-outline',
+  arquivoTexto: 'file-document-outline',
+  arquivoCompactado: 'folder-zip-outline',
+  arquivoDocumento: 'file-document-multiple-outline',
+  anexar: 'paperclip',
+  baixar: 'download-outline',
+
   // Sinalização
   ajuda: 'help-circle-outline',
   info: 'information-outline',

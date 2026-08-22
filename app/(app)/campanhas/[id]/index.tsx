@@ -4,7 +4,7 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, campaignsApi } from '@/api';
-import type { CampaignNote } from '@/api/types';
+import type { CampaignNote, NoteAttachment } from '@/api/types';
 import {
   Button,
   Card,
@@ -29,6 +29,7 @@ import {
   useJoinPublicCampaign,
   useUpdateCampaign,
 } from '@/hooks/useCampaigns';
+import { iconeDoAnexo } from '@/utils/arquivo';
 import { radius, spacing, useTheme } from '@/theme';
 
 /**
@@ -132,8 +133,8 @@ export default function CampaignScreen() {
         <Card title="Mesa aberta" subtitle="Você está visitando esta campanha">
           <View style={{ gap: spacing.md }}>
             <Text variant="small" tone="secondary">
-              Qualquer jogador pode entrar nesta mesa. Participando, você vincula seus personagens,
-              escreve nas anotações e acompanha a sessão ao vivo.
+              Qualquer jogador pode entrar nesta mesa. Participando, você vincula seus personagens, escreve
+              nas anotações e acompanha a sessão ao vivo.
             </Text>
             <Button
               label="Participar da campanha"
@@ -366,14 +367,7 @@ function NotasDaCampanha({
                   backgroundColor: pressed ? colors.surfaceHover : colors.surfaceAlt,
                 })}
               >
-                {nota.images && nota.images[0] ? (
-                  <Image
-                    source={{ uri: nota.images[0].url }}
-                    style={{ width: 44, height: 44, borderRadius: radius.sm }}
-                    contentFit="cover"
-                    transition={150}
-                  />
-                ) : null}
+                <Selo anexos={nota.attachments ?? []} />
 
                 <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                   <Text variant="bodyStrong" numberOfLines={1}>
@@ -399,5 +393,50 @@ function NotasDaCampanha({
         />
       </View>
     </Card>
+  );
+}
+
+/**
+ * O que identifica a anotação de relance na prévia da campanha.
+ *
+ * A primeira imagem, quando há uma — retrato do NPC, brasão da guilda. Se o
+ * único anexo for um PDF ou uma planilha, entra o ícone dele; sem anexo
+ * nenhum, não entra nada e o texto ocupa a linha inteira.
+ */
+function Selo({ anexos }: { anexos: NoteAttachment[] }) {
+  const { colors } = useTheme();
+
+  const imagem = anexos.find((anexo) => anexo.kind === 'image');
+
+  if (imagem) {
+    return (
+      <Image
+        source={{ uri: imagem.url }}
+        style={{ width: 44, height: 44, borderRadius: radius.sm }}
+        contentFit="cover"
+        transition={150}
+      />
+    );
+  }
+
+  const primeiro = anexos[0];
+
+  if (!primeiro) return null;
+
+  return (
+    <View
+      style={{
+        width: 44,
+        height: 44,
+        borderRadius: radius.sm,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+      }}
+    >
+      <Icon name={iconeDoAnexo(primeiro.kind)} size={22} color={colors.accentInk} />
+    </View>
   );
 }

@@ -30,3 +30,5 @@ export { ThemeToggle, type ThemeToggleProps } from './ThemeToggle';
 export { TitlePlate, type TitlePlateProps } from './TitlePlate';
 export { Toast, type ToastProps } from './Toast';
 export { Tooltip, type TooltipProps } from './Tooltip';
+export { WebFrame } from './WebFrame';
+export { type WebFrameProps } from './WebFrame.types';

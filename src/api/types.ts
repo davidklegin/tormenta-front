@@ -85,10 +85,22 @@ export type CampaignMember = {
 export type NoteCategory =
   'npcs' | 'lugares' | 'missoes' | 'pistas' | 'itens' | 'organizacoes' | 'sessoes' | 'outros';
 
-export type CampaignNoteImage = {
+/**
+ * Como o app deve exibir um anexo. Vem decidido do servidor: o MIME type é
+ * mentiroso o suficiente para não valer a pena reinterpretar de novo aqui.
+ */
+export type AttachmentKind = 'image' | 'pdf' | 'video' | 'audio' | 'text' | 'archive' | 'document' | 'other';
+
+/** Arquivo anexado a uma anotação — imagem, PDF, planilha, áudio da sessão. */
+export type NoteAttachment = {
   id: number;
   url: string;
+  name: string;
+  mime_type: string | null;
+  kind: AttachmentKind;
+  kind_label: string;
   caption: string | null;
+  size_bytes: number | null;
   sort_order: number;
 };
 
@@ -97,7 +109,7 @@ export type CampaignNote = {
   campaign_id: number;
   title: string;
   body: string | null;
-  images?: CampaignNoteImage[];
+  attachments?: NoteAttachment[];
   category: NoteCategory;
   category_label: string;
   visibility: 'campaign' | 'master_only';
@@ -356,6 +368,7 @@ export type CharacterNote = {
   title: string;
   body: string | null;
   pinned: boolean;
+  attachments?: NoteAttachment[];
   created_at: string | null;
   updated_at: string | null;
 };

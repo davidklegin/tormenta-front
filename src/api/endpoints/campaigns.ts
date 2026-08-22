@@ -4,10 +4,10 @@ import type {
   CampaignScope,
   CampaignMember,
   CampaignNote,
-  CampaignNoteImage,
   CharacterSummary,
   Envelope,
   MasterDashboard,
+  NoteAttachment,
   NoteCategory,
   Paginated,
 } from '../types';
@@ -85,20 +85,20 @@ export const campaignsApi = {
   removeNote: (id: number, noteId: number) =>
     apiRequest<{ message: string }>(`/campaigns/${id}/notes/${noteId}`, { method: 'DELETE' }),
 
-  // Imagens das anotações — retratos de NPCs, mapas, brasões
-  addNoteImage: (id: number, noteId: number, form: FormData) =>
-    apiUpload<{ data: CampaignNoteImage }>(`/campaigns/${id}/notes/${noteId}/images`, form).then(
+  // Anexos das anotações — retratos de NPCs, mapas, PDFs, planilhas, áudios
+  addNoteAttachment: (id: number, noteId: number, form: FormData) =>
+    apiUpload<{ data: NoteAttachment }>(`/campaigns/${id}/notes/${noteId}/attachments`, form).then(
       (r) => r.data
     ),
 
-  updateNoteImage: (id: number, noteId: number, imageId: number, payload: { caption?: string }) =>
-    apiRequest<{ data: CampaignNoteImage }>(`/campaigns/${id}/notes/${noteId}/images/${imageId}`, {
+  updateNoteAttachment: (id: number, noteId: number, attachmentId: number, payload: { caption?: string }) =>
+    apiRequest<{ data: NoteAttachment }>(`/campaigns/${id}/notes/${noteId}/attachments/${attachmentId}`, {
       method: 'PUT',
       body: payload,
     }).then((r) => r.data),
 
-  removeNoteImage: (id: number, noteId: number, imageId: number) =>
-    apiRequest<{ message: string }>(`/campaigns/${id}/notes/${noteId}/images/${imageId}`, {
+  removeNoteAttachment: (id: number, noteId: number, attachmentId: number) =>
+    apiRequest<{ message: string }>(`/campaigns/${id}/notes/${noteId}/attachments/${attachmentId}`, {
       method: 'DELETE',
     }),
 };

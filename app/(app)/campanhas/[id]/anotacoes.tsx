@@ -1,10 +1,9 @@
 import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { Image } from 'expo-image';
 import { useLocalSearchParams } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { campaignsApi } from '@/api';
-import type { CampaignNote, CampaignNoteImage, NoteCategory } from '@/api/types';
+import type { CampaignNote, NoteAttachment, NoteCategory } from '@/api/types';
 import {
   Button,
   Card,
@@ -20,16 +19,12 @@ import {
 } from '@/components/ui';
 import { PageHeader } from '@/components/layout';
 import {
-  NoteImages,
-  buildNoteImageForm,
-  type PendingNoteImage,
-} from '@/components/campaign/NoteImages';
-import {
-  campaignKeys,
-  useCampaign,
-  useCampaignNoteMutations,
-  useCampaignNotes,
-} from '@/hooks/useCampaigns';
+  AttachmentStrip,
+  NoteAttachments,
+  buildAttachmentForm,
+  type PendingAttachment,
+} from '@/components/files';
+import { campaignKeys, useCampaign, useCampaignNoteMutations, useCampaignNotes } from '@/hooks/useCampaigns';
 import { useCampaignChannel } from '@/realtime/useCampaignChannel';
 import { NOTE_CATEGORY_LABELS } from '@/rules';
 import { radius, spacing, useTheme } from '@/theme';
@@ -149,42 +144,8 @@ export default function CampaignNotesScreen() {
                 {note.visibility === 'master_only' ? <Chip label="Mestre" compact tone="gold" /> : null}
               </View>
 
-              {note.images && note.images.length > 0 ? (
-                <View style={{ flexDirection: 'row', gap: spacing.xs, marginTop: spacing.xs }}>
-                  {note.images.slice(0, 4).map((imagem) => (
-                    <Image
-                      key={imagem.id}
-                      source={{ uri: imagem.url }}
-                      style={{
-                        width: 56,
-                        height: 56,
-                        borderRadius: radius.sm,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                      }}
-                      contentFit="cover"
-                      transition={150}
-                    />
-                  ))}
-                  {note.images.length > 4 ? (
-                    <View
-                      style={{
-                        width: 56,
-                        height: 56,
-                        borderRadius: radius.sm,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: colors.surfaceAlt,
-                      }}
-                    >
-                      <Text variant="caption" tone="muted">
-                        +{note.images.length - 4}
-                      </Text>
-                    </View>
-                  ) : null}
-                </View>
+              {note.attachments && note.attachments.length > 0 ? (
+                <AttachmentStrip attachments={note.attachments} />
               ) : null}
 
               {note.body ? (
@@ -219,7 +180,10 @@ export default function CampaignNotesScreen() {
         visible={formOpen}
         onClose={() => setFormOpen(false)}
         campaignId={campaignId}
-        note={editing}
+        /* A versão recém-carregada, e não a que abriu o formulário: anexar um
+           arquivo recarrega a lista, e é dali que sai o que o visualizador
+           mostra. */
+        note={editing ? ((notes.data?.data ?? []).find((nota) => nota.id === editing.id) ?? editing) : null}
         isMaster={isMaster}
         /* Criando com um filtro ativo, a categoria já vem escolhida — quem
            está em "Missões" quase sempre quer criar uma missão. */
@@ -254,9 +218,9 @@ function NoteForm({
   const [category, setCategory] = useState<NoteCategory>(note?.category ?? defaultCategory);
   const [masterOnly, setMasterOnly] = useState(note?.visibility === 'master_only');
 
-  // Imagens escolhidas antes de a anotação existir — sobem depois do create.
-  const [pending, setPending] = useState<PendingNoteImage[]>([]);
-  const [imageError, setImageError] = useState<string | null>(null);
+  // Arquivos escolhidos antes de a anotação existir — sobem depois do create.
+  const [pending, setPending] = useState<PendingAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
 
   // Se o create passou mas um upload falhou, a anotação já existe: um segundo
   // "Salvar" precisa editá-la e retentar as imagens, nunca criar outra.
@@ -272,7 +236,7 @@ function NoteForm({
   function fechar() {
     criada.current = null;
     setPending([]);
-    setImageError(null);
+    setAttachmentError(null);
     onClose();
   }
 
@@ -301,25 +265,25 @@ function NoteForm({
     if (!note) criada.current = salva;
 
     if (pending.length > 0) {
-      const restantes: PendingNoteImage[] = [];
-      const enviadas: CampaignNoteImage[] = [];
+      const restantes: PendingAttachment[] = [];
+      const enviados: NoteAttachment[] = [];
 
-      for (const imagem of pending) {
+      for (const arquivo of pending) {
         try {
-          enviadas.push(
-            await campaignsApi.addNoteImage(campaignId, salva.id, await buildNoteImageForm(imagem))
+          enviados.push(
+            await campaignsApi.addNoteAttachment(campaignId, salva.id, await buildAttachmentForm(arquivo))
           );
         } catch {
-          restantes.push(imagem);
+          restantes.push(arquivo);
         }
       }
 
-      // A nota que acabou de nascer não conhece as imagens dela: sem isto, um
+      // A nota que acabou de nascer não conhece os anexos dela: sem isto, um
       // envio parcial esconderia da tira o que já subiu.
       if (criada.current) {
         criada.current = {
           ...criada.current,
-          images: [...(criada.current.images ?? []), ...enviadas],
+          attachments: [...(criada.current.attachments ?? []), ...enviados],
         };
       }
 
@@ -327,8 +291,8 @@ function NoteForm({
       invalidarNotas();
 
       if (restantes.length > 0) {
-        setImageError(
-          'A anotação foi salva, mas não conseguimos enviar todas as imagens. Tente salvar de novo.'
+        setAttachmentError(
+          'A anotação foi salva, mas não conseguimos enviar todos os arquivos. Tente salvar de novo.'
         );
 
         return;
@@ -369,24 +333,26 @@ function NoteForm({
 
       <View style={{ gap: spacing.sm }}>
         <Text variant="smallStrong" tone="secondary">
-          Imagens
+          Arquivos
         </Text>
 
         {/* Sem anotação salva ainda (NPC sendo cadastrado), as escolhas ficam
             em espera e sobem junto com o "Salvar". */}
-        <NoteImages
-          campaignId={campaignId}
-          noteId={alvo?.id ?? null}
-          images={alvo?.images ?? []}
+        <NoteAttachments
+          attachments={alvo?.attachments ?? []}
           editable={alvo ? alvo.can_edit : true}
+          onUpload={alvo ? (form) => campaignsApi.addNoteAttachment(campaignId, alvo.id, form) : undefined}
+          onRemove={
+            alvo ? (anexo) => campaignsApi.removeNoteAttachment(campaignId, alvo.id, anexo.id) : undefined
+          }
           onChanged={invalidarNotas}
           pending={pending}
           onPendingChange={setPending}
         />
 
-        {imageError ? (
+        {attachmentError ? (
           <Text variant="small" tone="danger">
-            {imageError}
+            {attachmentError}
           </Text>
         ) : null}
       </View>

@@ -13,6 +13,7 @@ import type {
   CharacterSpell,
   CharacterSummary,
   Envelope,
+  NoteAttachment,
   Vitals,
 } from '../types';
 
@@ -273,4 +274,15 @@ export const charactersApi = {
     }).then((r) => r.data),
   removeNote: (id: number, noteId: number) =>
     apiRequest<{ message: string }>(`/characters/${id}/notes/${noteId}`, { method: 'DELETE' }),
+
+  // Anexos da anotação pessoal — privados como ela
+  addNoteAttachment: (id: number, noteId: number, form: FormData) =>
+    apiUpload<{ data: NoteAttachment }>(`/characters/${id}/notes/${noteId}/attachments`, form).then(
+      (r) => r.data
+    ),
+
+  removeNoteAttachment: (id: number, noteId: number, attachmentId: number) =>
+    apiRequest<{ message: string }>(`/characters/${id}/notes/${noteId}/attachments/${attachmentId}`, {
+      method: 'DELETE',
+    }),
 };

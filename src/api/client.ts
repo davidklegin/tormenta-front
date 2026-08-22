@@ -93,7 +93,7 @@ type RequestOptions = {
  */
 function mensagemPadrao(status: number): string {
   if (status === 413) {
-    return 'O arquivo é grande demais para o servidor aceitar. Escolha uma imagem menor.';
+    return 'O arquivo é grande demais para o servidor aceitar. Escolha um menor.';
   }
 
   return `Erro ${status} ao falar com o servidor.`;
@@ -184,6 +184,36 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
   }
 
   return data as T;
+}
+
+/**
+ * Baixa um recurso da API sem interpretar o corpo.
+ *
+ * Existe para conteúdo que não é JSON — o arquivo de um anexo. Devolve a
+ * `Response` crua para quem chamou decidir se quer texto, blob ou stream, e
+ * carrega o mesmo Bearer token do resto do app.
+ */
+export async function apiFetchRaw(path: string): Promise<Response> {
+  const headers: Record<string, string> = {
+    'ngrok-skip-browser-warning': 'true',
+  };
+
+  const token = await tokenStorage.get();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const resposta = await fetch(buildUrl(baseUrl, `${API_PREFIX}${path}`), { headers });
+
+  if (!resposta.ok) {
+    if (resposta.status === 401) {
+      onUnauthorized?.();
+    }
+
+    throw new ApiError(mensagemPadrao(resposta.status), resposta.status);
+  }
+
+  return resposta;
 }
 
 /** Envio de arquivo (avatar do personagem, foto de perfil). */
