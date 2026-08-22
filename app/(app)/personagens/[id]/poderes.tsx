@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { charactersApi } from '@/api';
-import type { Character, CharacterPower } from '@/api/types';
+import type { Character, CharacterPower, CharacterPowerEffect } from '@/api/types';
 import { Button, Card, Chip, Input, SegmentedControl, Select, Sheet, Text, Toast } from '@/components/ui';
 import { PowerCatalogSheet } from '@/components/character/PowerCatalogSheet';
 import { SheetScreen } from '@/components/character/SheetScreen';
@@ -46,8 +46,15 @@ function PowersContent({ characterId, character }: { characterId: number; charac
   const [formOpen, setFormOpen] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [editing, setEditing] = useState<CharacterPower | null>(null);
-  const [detail, setDetail] = useState<CharacterPower | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+
+  // O detalhe sai da lista, e não de uma cópia no estado: assim, ligar um
+  // efeito atualiza o painel aberto sem o jogador precisar fechar e abrir.
+  const detail = useMemo(
+    () => character.powers.find((power) => power.id === detailId) ?? null,
+    [character.powers, detailId]
+  );
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['character', characterId] });
@@ -55,6 +62,12 @@ function PowersContent({ characterId, character }: { characterId: number; charac
 
   const removePower = useMutation({
     mutationFn: (id: number) => charactersApi.removePower(characterId, id),
+    onSuccess: invalidate,
+  });
+
+  const toggleEffect = useMutation({
+    mutationFn: ({ powerId, index, active }: { powerId: number; index: number; active: boolean }) =>
+      charactersApi.togglePowerEffect(characterId, powerId, index, active),
     onSuccess: invalidate,
   });
 
@@ -114,7 +127,7 @@ function PowersContent({ characterId, character }: { characterId: number; charac
           {powers.map((power) => (
             <Pressable
               key={power.id}
-              onPress={() => setDetail(power)}
+              onPress={() => setDetailId(power.id)}
               style={({ pressed }) => ({
                 backgroundColor: pressed ? colors.surfaceHover : colors.surface,
                 borderRadius: radius.lg,
@@ -138,6 +151,18 @@ function PowersContent({ characterId, character }: { characterId: number; charac
                 </Text>
               ) : null}
 
+              {/* O que este poder está somando agora — o jogador vê na lista
+                  que a Defesa dele já conta com a Esquiva. */}
+              {power.effects.some((efeito) => efeito.active && efeito.applied) ? (
+                <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
+                  {power.effects
+                    .filter((efeito) => efeito.active && efeito.applied)
+                    .map((efeito) => (
+                      <Chip key={efeito.index} label={efeito.text ?? ''} compact tone="success" />
+                    ))}
+                </View>
+              ) : null}
+
               {power.description ? (
                 <Text variant="small" tone="secondary" numberOfLines={2}>
                   {power.description}
@@ -148,7 +173,7 @@ function PowersContent({ characterId, character }: { characterId: number; charac
         </View>
       )}
 
-      <Sheet visible={detail !== null} onClose={() => setDetail(null)} title={detail?.name ?? ''}>
+      <Sheet visible={detail !== null} onClose={() => setDetailId(null)} title={detail?.name ?? ''}>
         {detail ? (
           <>
             <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
@@ -168,6 +193,24 @@ function PowersContent({ characterId, character }: { characterId: number; charac
               </View>
             ) : null}
 
+            {detail.effects.length > 0 ? (
+              <View style={{ gap: spacing.sm }}>
+                <Text variant="caption" tone="secondary" uppercase>
+                  Na ficha
+                </Text>
+                {detail.effects.map((efeito) => (
+                  <PowerEffectRow
+                    key={efeito.index}
+                    effect={efeito}
+                    canEdit={canEdit}
+                    onToggle={() =>
+                      toggleEffect.mutate({ powerId: detail.id, index: efeito.index, active: !efeito.active })
+                    }
+                  />
+                ))}
+              </View>
+            ) : null}
+
             <Text variant="body" tone="secondary">
               {detail.description || 'Sem descrição.'}
             </Text>
@@ -180,7 +223,7 @@ function PowersContent({ characterId, character }: { characterId: number; charac
                   style={{ flex: 1 }}
                   onPress={() => {
                     setEditing(detail);
-                    setDetail(null);
+                    setDetailId(null);
                     setFormOpen(true);
                   }}
                 />
@@ -190,7 +233,7 @@ function PowersContent({ characterId, character }: { characterId: number; charac
                   style={{ flex: 1 }}
                   onPress={() => {
                     removePower.mutate(detail.id);
-                    setDetail(null);
+                    setDetailId(null);
                   }}
                 />
               </View>
@@ -218,6 +261,55 @@ function PowersContent({ characterId, character }: { characterId: number; charac
       />
 
       {aviso ? <Toast message={aviso} tone="success" onDismiss={() => setAviso(null)} /> : null}
+    </View>
+  );
+}
+
+/**
+ * Um bônus do poder, e o interruptor de quem depende de situação.
+ *
+ * Bônus permanente aparece aceso e sem botão — ele já está na conta e não há
+ * o que decidir. Condicional é um chip que o jogador liga quando entra na
+ * situação, com a frase do livro logo abaixo, para ele conferir se é o caso.
+ */
+function PowerEffectRow({
+  effect,
+  canEdit,
+  onToggle,
+}: {
+  effect: CharacterPowerEffect;
+  canEdit: boolean;
+  onToggle: () => void;
+}) {
+  const ligavel = canEdit && effect.conditional && effect.applied;
+
+  return (
+    <View style={{ gap: spacing.xxs }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <Chip
+          label={effect.text ?? ''}
+          compact
+          tone={effect.applied ? 'success' : 'neutral'}
+          selected={effect.active && effect.applied}
+          onPress={ligavel ? onToggle : undefined}
+        />
+        {effect.conditional && !effect.active ? (
+          <Text variant="caption" tone="muted">
+            {ligavel ? 'toque para ligar' : 'desligado'}
+          </Text>
+        ) : null}
+        {!effect.applied ? (
+          <Text variant="caption" tone="muted">
+            some à mão
+          </Text>
+        ) : null}
+      </View>
+
+      {effect.condition ? (
+        <Text variant="caption" tone="secondary">
+          {effect.condition}
+        </Text>
+      ) : null}
     </View>
   );
 }

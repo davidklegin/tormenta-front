@@ -279,6 +279,21 @@ function LinhaDoPoder({
                 Pré-requisito: {power.requirements}
               </Text>
             ) : null}
+
+            {/* O que o poder faria na ficha. Dizer aqui que o condicional
+                entra desligado evita o jogador achar que a conta mudou. */}
+            {power.effects.length > 0 ? (
+              <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap', marginTop: 2 }}>
+                {power.effects.map((efeito, i) => (
+                  <Chip
+                    key={`${efeito.target}-${i}`}
+                    label={efeito.conditional ? `${efeito.text} (se…)` : efeito.text}
+                    compact
+                    tone={efeito.conditional ? 'neutral' : 'success'}
+                  />
+                ))}
+              </View>
+            ) : null}
           </View>
 
           {power.mp_cost ? <Chip label={power.mp_cost} compact tone="arcane" /> : null}

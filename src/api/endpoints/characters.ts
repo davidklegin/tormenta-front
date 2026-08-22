@@ -182,6 +182,15 @@ export const charactersApi = {
   removePower: (id: number, powerId: number) =>
     apiRequest<{ message: string }>(`/characters/${id}/powers/${powerId}`, { method: 'DELETE' }),
   /**
+   * Liga ou desliga um bônus do poder na ficha — o Combate Defensivo entra na
+   * Defesa enquanto o personagem luta na defensiva e sai quando ele para.
+   */
+  togglePowerEffect: (id: number, powerId: number, index: number, active: boolean) =>
+    apiRequest<{ data: CharacterPower }>(`/characters/${id}/powers/${powerId}/effect`, {
+      method: 'PATCH',
+      body: { index, active },
+    }).then((r) => r.data),
+  /**
    * Adiciona de uma vez os poderes marcados na biblioteca. O backend ignora os
    * que o personagem já tem e devolve quantos entraram e quantos pulou.
    */

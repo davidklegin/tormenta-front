@@ -231,6 +231,41 @@ export type CharacterPower = {
   requirements: string | null;
   mp_cost: string | null;
   description: string | null;
+  /** Bônus que o poder soma na ficha; vazio para poder digitado à mão. */
+  effects: CharacterPowerEffect[];
+};
+
+/**
+ * Um bônus do poder já somado (ou pronto para somar) na ficha.
+ *
+ * Bônus permanente ("Você recebe +2 na Defesa e Reflexos") nasce ligado. O que
+ * depende de situação nasce desligado, com a condição escrita: o +5 na Defesa
+ * do Combate Defensivo custa −2 em todos os ataques e dura um turno, então
+ * quem decide quando ele vale é o jogador.
+ */
+export type CharacterPowerEffect = {
+  /** Posição no poder — é por ela que o efeito é ligado e desligado. */
+  index: number;
+  target: PowerEffectTarget;
+  value: number;
+  text: string | null;
+  conditional: boolean;
+  condition: string | null;
+  active: boolean;
+  /** false quando a ficha ainda não soma esse alvo; o jogador soma à mão. */
+  applied: boolean;
+};
+
+export type PowerEffectTarget = 'skill' | 'defense' | 'hp' | 'mp' | 'displacement' | 'attribute';
+
+/** O mesmo bônus visto do catálogo, antes de entrar em qualquer ficha. */
+export type CatalogPowerEffect = {
+  target: PowerEffectTarget;
+  keys?: string[];
+  value: number;
+  text: string;
+  conditional?: boolean;
+  condition?: string;
 };
 
 /** Poder na biblioteca — o resumo que a lista de escolha exibe. */
@@ -250,6 +285,8 @@ export type CatalogPower = {
   races: string[];
   requirements: string | null;
   mp_cost: string | null;
+  /** O que este poder somaria na ficha, se escolhido. */
+  effects: CatalogPowerEffect[];
 };
 
 /** Ficha completa do poder na biblioteca. */
