@@ -38,6 +38,24 @@ export function formatarTamanho(bytes: number | null | undefined): string {
 }
 
 /**
+ * Teto de tamanho por arquivo, em bytes. Espelha o `TAMANHO_MAXIMO_KB` de
+ * `App\Support\AttachmentUpload` — e, acima dele, o `post_max_size` do PHP e o
+ * `client_max_body_size` do nginx.
+ *
+ * Está aqui para o app poder dizer "esse arquivo tem 62 MB" na hora da escolha,
+ * em vez de gastar minutos de upload para receber um 413 mudo no fim.
+ */
+export const TAMANHO_MAXIMO_BYTES = 50 * 1024 * 1024;
+
+/** Erro de arquivo grande demais, com a mensagem já pronta para a tela. */
+export class ArquivoGrandeDemaisError extends Error {
+  constructor(bytes: number) {
+    super(`O arquivo tem ${formatarTamanho(bytes)} e o limite é 50 MB.`);
+    this.name = 'ArquivoGrandeDemaisError';
+  }
+}
+
+/**
  * Anexos que o app abre por dentro, sem sair para outro aplicativo.
  *
  * `other`, `archive` e `document` ficam de fora não por descuido: não há como

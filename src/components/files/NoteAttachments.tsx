@@ -7,6 +7,7 @@ import { useMutation } from '@tanstack/react-query';
 import { ApiError } from '@/api';
 import type { NoteAttachment } from '@/api/types';
 import { Button, Icon, Text, iconSize } from '@/components/ui';
+import { ArquivoGrandeDemaisError, TAMANHO_MAXIMO_BYTES } from '@/utils/arquivo';
 import { prepararImagemParaUpload } from '@/utils/imagem';
 import { formatarTamanho, iconeDoAnexo } from '@/utils/arquivo';
 import { radius, spacing, stroke, useTheme } from '@/theme';
@@ -36,18 +37,20 @@ function proximaChave(): string {
 }
 
 /**
- * Abre a galeria e devolve o que foi escolhido, já reduzido.
+ * Abre a galeria e devolve o que foi escolhido, no formato do upload.
  *
- * O `quality` do picker só reencoda; não mexe nas dimensões. Uma foto de
- * celular continuaria saindo com 4000 px e vários MB — e morreria no 413 do
- * nginx antes de chegar ao Laravel. Quem encolhe de verdade é o preparo.
+ * `quality: 1` — que é o padrão do picker — porque a imagem sobe como veio: o
+ * mapa da masmorra e o retrato do NPC são anexados justamente por serem
+ * grandes, e o servidor aceita 50 MB por arquivo. Acima disso o preparo lança
+ * `ArquivoGrandeDemaisError` aqui, em vez de gastar o upload inteiro para
+ * receber um 413 mudo no fim.
  */
 export async function pickNoteImages(): Promise<PendingAttachment[]> {
   const resultado = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
     allowsMultipleSelection: true,
     selectionLimit: 10,
-    quality: 0.85,
+    quality: 1,
   });
 
   if (resultado.canceled) return [];
@@ -63,9 +66,9 @@ export async function pickNoteImages(): Promise<PendingAttachment[]> {
 /**
  * Abre o seletor de arquivos do sistema — qualquer tipo.
  *
- * Diferente da galeria, aqui o arquivo sobe como está: não há como reduzir um
- * PDF ou um zip, e reduzir a imagem exigiria descobrir as dimensões primeiro.
- * Quem manda foto pela galeria continua tendo o encolhimento automático.
+ * Como na galeria, o arquivo sobe como está; muda só de onde ele vem. O `size`
+ * do picker é opcional: quando o sistema não informa, quem barra o arquivo
+ * grande demais é a validação do servidor.
  */
 export async function pickNoteFiles(): Promise<PendingAttachment[]> {
   const resultado = await DocumentPicker.getDocumentAsync({
@@ -76,13 +79,19 @@ export async function pickNoteFiles(): Promise<PendingAttachment[]> {
 
   if (resultado.canceled) return [];
 
-  return resultado.assets.map((asset) => ({
-    key: proximaChave(),
-    uri: asset.uri,
-    name: asset.name,
-    type: asset.mimeType ?? 'application/octet-stream',
-    size: asset.size ?? undefined,
-  }));
+  return resultado.assets.map((asset) => {
+    if (asset.size && asset.size > TAMANHO_MAXIMO_BYTES) {
+      throw new ArquivoGrandeDemaisError(asset.size);
+    }
+
+    return {
+      key: proximaChave(),
+      uri: asset.uri,
+      name: asset.name,
+      type: asset.mimeType ?? 'application/octet-stream',
+      size: asset.size ?? undefined,
+    };
+  });
 }
 
 /**
@@ -166,9 +175,15 @@ export function NoteAttachments({
       if (enviou) onChanged();
     },
     // O servidor sabe dizer o que houve — tamanho acima do limite, teto de
-    // arquivos da anotação. Repetir isso é mais útil que um "falhou".
+    // arquivos da anotação. Repetir isso é mais útil que um "falhou". Quando o
+    // próprio app barrou o arquivo na escolha, a mensagem já vem pronta e nem
+    // chega a haver requisição.
     onError: (falha) =>
-      setErro(falha instanceof ApiError ? falha.message : 'Não foi possível enviar o arquivo.'),
+      setErro(
+        falha instanceof ArquivoGrandeDemaisError || falha instanceof ApiError
+          ? falha.message
+          : 'Não foi possível enviar o arquivo.'
+      ),
   });
 
   const remover = useMutation({

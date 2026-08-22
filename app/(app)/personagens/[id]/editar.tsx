@@ -28,6 +28,7 @@ import { useLinkableCampaigns } from '@/hooks/useCampaigns';
 import { useCharacter, useDeleteCharacter, useUpdateCharacter } from '@/hooks/useCharacters';
 import { useReference } from '@/hooks/useReference';
 import { ATTRIBUTE_LABELS, ATTRIBUTE_ORDER, previewDefense, signed } from '@/rules';
+import { ArquivoGrandeDemaisError } from '@/utils/arquivo';
 import { prepararImagemParaUpload } from '@/utils/imagem';
 import { spacing } from '@/theme';
 
@@ -187,13 +188,13 @@ function EditForm({ character }: { character: Character }) {
         mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 1,
       });
 
       if (result.canceled || !result.assets[0]) return null;
 
-      // Reduzida antes de subir: o recorte do picker mantém as dimensões
-      // originais, e uma foto de celular estoura o limite de corpo do servidor.
+      // Sobe como veio do recorte, sem reduzir: o servidor aceita 50 MB. O
+      // preparo só acerta nome e tipo — e barra o que passa do teto.
       const imagem = await prepararImagemParaUpload(result.assets[0], 'avatar');
       const formData = new FormData();
 
@@ -218,7 +219,12 @@ function EditForm({ character }: { character: Character }) {
         setMessage('Foto atualizada.');
       }
     },
-    onError: () => setError('Não foi possível enviar a foto.'),
+    onError: (falha) =>
+      setError(
+        falha instanceof ArquivoGrandeDemaisError
+          ? falha.message
+          : 'Não foi possível enviar a foto.'
+      ),
   });
 
   async function handleSave() {
