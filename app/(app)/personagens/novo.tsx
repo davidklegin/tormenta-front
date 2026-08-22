@@ -5,6 +5,12 @@ import { ApiError } from '@/api';
 import type { AttributeKey } from '@/api/types';
 import { Button, Card, Chip, HelpNote, Input, Loading, Screen, Select, Text } from '@/components/ui';
 import { PageHeader } from '@/components/layout';
+import {
+  RaceFields,
+  modificadoresRaciais,
+  pendenciaDeEscolhas,
+  type RaceChoice,
+} from '@/components/character/RaceFields';
 import { useLinkableCampaigns } from '@/hooks/useCampaigns';
 import { useCreateCharacter } from '@/hooks/useCharacters';
 import { useReference } from '@/hooks/useReference';
@@ -24,9 +30,7 @@ export default function NewCharacterScreen() {
   const createCharacter = useCreateCharacter();
 
   const [name, setName] = useState('');
-  const [raceId, setRaceId] = useState<number | null>(null);
-  const [raceVariant, setRaceVariant] = useState<string | null>(null);
-  const [racialChoices, setRacialChoices] = useState<AttributeKey[]>([]);
+  const [raca, setRaca] = useState<RaceChoice>({ raceId: null, variant: null, choices: [] });
   const [classKey, setClassKey] = useState<string | null>(null);
   const [level, setLevel] = useState('1');
   const [keyAttribute, setKeyAttribute] = useState<AttributeKey | null>(null);
@@ -44,8 +48,8 @@ export default function NewCharacterScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const race = useMemo(
-    () => reference.data?.races.find((entry) => entry.id === raceId) ?? null,
-    [reference.data?.races, raceId]
+    () => reference.data?.races.find((entry) => entry.id === raca.raceId) ?? null,
+    [reference.data?.races, raca.raceId]
   );
 
   const gameClass = useMemo(
@@ -63,21 +67,10 @@ export default function NewCharacterScreen() {
   );
 
   /** Modificadores raciais previstos, incluindo as escolhas livres. */
-  const racialPreview = useMemo(() => {
-    if (!race) return {} as Partial<Record<AttributeKey, number>>;
-
-    const base: Partial<Record<AttributeKey, number>> = {
-      ...(raceVariant && race.variants?.[raceVariant]
-        ? race.variants[raceVariant].attribute_modifiers
-        : (race.attribute_modifiers ?? {})),
-    };
-
-    for (const key of racialChoices) {
-      base[key] = (base[key] ?? 0) + race.free_choice_bonus;
-    }
-
-    return base;
-  }, [race, raceVariant, racialChoices]);
+  const racialPreview = useMemo(
+    () => modificadoresRaciais(race, raca.variant, raca.choices),
+    [race, raca.variant, raca.choices]
+  );
 
   /** Prévia dos PM: o que a classe dá por nível mais o atributo-chave. */
   const mpPreview = useMemo(() => {
@@ -90,30 +83,15 @@ export default function NewCharacterScreen() {
       : 0;
     const total = Math.max(0, fromClass + bonus);
 
-    const parts = [`${gameClass.mp_per_level} x ${levels} ${levels === 1 ? 'nível' : 'níveis'} = ${fromClass}`];
+    const parts = [
+      `${gameClass.mp_per_level} x ${levels} ${levels === 1 ? 'nível' : 'níveis'} = ${fromClass}`,
+    ];
     if (effectiveKeyAttribute) {
       parts.push(`${ATTRIBUTE_LABELS[effectiveKeyAttribute].full} ${signed(bonus)}`);
     }
 
     return { total, label: `PM totais: ${parts.join(', ')} → ${total}` };
   }, [gameClass, level, effectiveKeyAttribute, attributes, racialPreview]);
-
-  function toggleRacialChoice(key: AttributeKey) {
-    if (!race) return;
-    if (race.excluded_attributes?.includes(key)) return;
-
-    setRacialChoices((previous) => {
-      if (previous.includes(key)) {
-        return previous.filter((entry) => entry !== key);
-      }
-
-      if (previous.length >= race.free_choices) {
-        return previous;
-      }
-
-      return [...previous, key];
-    });
-  }
 
   async function handleSubmit() {
     if (name.trim().length < 2) {
@@ -128,10 +106,10 @@ export default function NewCharacterScreen() {
       return;
     }
 
-    if (race && race.free_choices > 0 && racialChoices.length !== race.free_choices) {
-      setError(
-        `${race.name} recebe +${race.free_choice_bonus} em ${race.free_choices} atributos diferentes.`
-      );
+    const pendencia = pendenciaDeEscolhas(race, raca.choices);
+
+    if (pendencia) {
+      setError(pendencia);
 
       return;
     }
@@ -141,9 +119,9 @@ export default function NewCharacterScreen() {
     try {
       const character = await createCharacter.mutateAsync({
         name: name.trim(),
-        race_id: raceId,
-        race_variant: raceVariant,
-        racial_attribute_choices: racialChoices.length > 0 ? racialChoices : undefined,
+        race_id: raca.raceId,
+        race_variant: raca.variant,
+        racial_attribute_choices: raca.choices.length > 0 ? raca.choices : undefined,
         origin_id: originId,
         deity_id: deityId,
         campaign_id: campaignId,
@@ -183,62 +161,7 @@ export default function NewCharacterScreen() {
         <View style={{ gap: spacing.md }}>
           <Input label="Nome" value={name} onChangeText={setName} placeholder="Como será chamado na mesa" />
 
-          <Select
-            label="Raça"
-            value={raceId}
-            options={(reference.data?.races ?? []).map((entry) => ({
-              value: entry.id,
-              label: entry.name,
-              description: describeRace(entry),
-            }))}
-            onChange={(value) => {
-              setRaceId(value);
-              setRaceVariant(null);
-              setRacialChoices([]);
-            }}
-            clearable
-          />
-
-          {race?.variants ? (
-            <Select
-              label="Herança"
-              value={raceVariant}
-              options={Object.entries(race.variants).map(([key, variant]) => ({
-                value: key,
-                label: variant.name,
-                description: describeModifiers(variant.attribute_modifiers),
-              }))}
-              onChange={setRaceVariant}
-              searchable={false}
-            />
-          ) : null}
-
-          {/* Raças com "+1 em três atributos diferentes" (p. 18) */}
-          {race && race.free_choices > 0 ? (
-            <View style={{ gap: spacing.sm }}>
-              <Text variant="smallStrong" tone="secondary">
-                Escolha {race.free_choices} atributos para +{race.free_choice_bonus}
-                {race.excluded_attributes?.length
-                  ? ` (exceto ${race.excluded_attributes.map((key) => ATTRIBUTE_LABELS[key].short).join(', ')})`
-                  : ''}
-              </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
-                {ATTRIBUTE_ORDER.map((key) => {
-                  const excluded = race.excluded_attributes?.includes(key) ?? false;
-
-                  return (
-                    <Chip
-                      key={key}
-                      label={ATTRIBUTE_LABELS[key].short}
-                      selected={racialChoices.includes(key)}
-                      tone={excluded ? 'neutral' : 'primary'}
-                      onPress={excluded ? undefined : () => toggleRacialChoice(key)}
-                    />
-                  );
-                })}
-              </View>
-            </View>
-          ) : null}
+          <RaceFields races={reference.data?.races ?? []} value={raca} onChange={setRaca} />
 
           <View style={{ flexDirection: 'row', gap: spacing.md }}>
             <View style={{ flex: 2 }}>
@@ -454,31 +377,4 @@ function StepperButton({ label, onPress }: { label: string; onPress: () => void 
       </Text>
     </Pressable>
   );
-}
-
-function describeRace(race: {
-  attribute_modifiers: Partial<Record<AttributeKey, number>> | null;
-  free_choices: number;
-  free_choice_bonus: number;
-  excluded_attributes: AttributeKey[] | null;
-}): string {
-  const parts: string[] = [];
-
-  if (race.free_choices > 0) {
-    const except = race.excluded_attributes?.length
-      ? ` (exceto ${race.excluded_attributes.map((key) => ATTRIBUTE_LABELS[key].short).join(', ')})`
-      : '';
-    parts.push(`+${race.free_choice_bonus} em ${race.free_choices} atributos${except}`);
-  }
-
-  const fixed = describeModifiers(race.attribute_modifiers ?? {});
-  if (fixed) parts.push(fixed);
-
-  return parts.join(' · ');
-}
-
-function describeModifiers(modifiers: Partial<Record<AttributeKey, number>>): string {
-  return Object.entries(modifiers)
-    .map(([key, value]) => `${ATTRIBUTE_LABELS[key as AttributeKey].short} ${signed(value as number)}`)
-    .join(', ');
 }
