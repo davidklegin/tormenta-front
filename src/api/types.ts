@@ -532,6 +532,42 @@ export type ReferenceCondition = {
   is_incapacitating: boolean;
 };
 
+/**
+ * Uma escolha dentro de um passo de construção — e, quando ela mesma abre
+ * outra escolha, as filhas ('Afinidade Elemental' → água, fogo, vegetação).
+ *
+ * Os campos numéricos só aparecem em quem os concede: o tamanho Minúsculo do
+ * duende traz size, displacement e Força –1; um presente qualquer, nenhum.
+ */
+export type RaceBuildOption = {
+  name: string;
+  text?: string;
+  choose?: number;
+  options?: RaceBuildOption[];
+  size?: string;
+  displacement?: number;
+  attribute_modifiers?: Partial<Record<AttributeKey, number>>;
+  free_choices?: number;
+  free_choice_bonus?: number;
+};
+
+/**
+ * Passo de construção de uma raça montável (duende, p. 32 de Heróis de Arton).
+ *
+ * `choose` é quantas opções o passo pede (três presentes entre doze);
+ * `grants_free_choices`, quantos atributos livres ele concede (os dois +1 do
+ * passo de dons); `entries`, itens sem nome próprio — a lista de tabus.
+ */
+export type RaceBuildStep = {
+  key: string;
+  name: string;
+  text?: string;
+  choose?: number;
+  grants_free_choices?: number;
+  options?: RaceBuildOption[];
+  entries?: string[];
+};
+
 export type ReferenceRace = {
   id: number;
   key: string;
@@ -539,13 +575,21 @@ export type ReferenceRace = {
   attribute_modifiers: Partial<Record<AttributeKey, number>> | null;
   free_choices: number;
   free_choice_bonus: number;
+  /** Os +1 não podem empilhar no mesmo atributo (humano, duende). */
+  distinct_choices: boolean;
   excluded_attributes: AttributeKey[] | null;
   variants: Record<
     string,
     { name: string; attribute_modifiers: Partial<Record<AttributeKey, number>> }
   > | null;
+  /** Só raças montáveis: null para quem tem ficha fixa. */
+  build_steps: RaceBuildStep[] | null;
+  creature_type: string | null;
   default_size: string;
+  /** Tamanho e deslocamento do duende saem do passo 2, não da ficha. */
+  size_by_choice: boolean;
   default_displacement: number;
+  displacement_by_choice: boolean;
   is_common: boolean;
   description: string | null;
 };
