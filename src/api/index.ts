@@ -14,6 +14,7 @@ export { authApi } from './endpoints/auth';
 export { campaignsApi } from './endpoints/campaigns';
 export { charactersApi } from './endpoints/characters';
 export type { CharacterPayload, VitalsPayload, VitalsResponse } from './endpoints/characters';
+export { powersApi } from './endpoints/powers';
 export { referenceApi } from './endpoints/reference';
 export { spellsApi } from './endpoints/spells';
 export type * from './types';

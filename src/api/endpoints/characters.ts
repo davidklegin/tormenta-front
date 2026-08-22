@@ -181,6 +181,15 @@ export const charactersApi = {
     }).then((r) => r.data),
   removePower: (id: number, powerId: number) =>
     apiRequest<{ message: string }>(`/characters/${id}/powers/${powerId}`, { method: 'DELETE' }),
+  /**
+   * Adiciona de uma vez os poderes marcados na biblioteca. O backend ignora os
+   * que o personagem já tem e devolve quantos entraram e quantos pulou.
+   */
+  importPowers: (id: number, powerIds: number[]) =>
+    apiRequest<{ data: CharacterPower[]; added: number; skipped: number }>(
+      `/characters/${id}/powers/import`,
+      { method: 'POST', body: { power_ids: powerIds } }
+    ),
 
   // --- magias ---
   spells: (id: number, filters?: { q?: string; circle?: number; tradition?: string; school?: string }) =>

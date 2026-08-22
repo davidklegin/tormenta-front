@@ -233,6 +233,48 @@ export type CharacterPower = {
   description: string | null;
 };
 
+/** Poder na biblioteca — o resumo que a lista de escolha exibe. */
+export type CatalogPower = {
+  id: number;
+  key: string;
+  name: string;
+  type: CharacterPower['type'];
+  type_label: string;
+  /** Grupo da wiki: Combate, Destino, Escola de Combate, Concedido, Raça… */
+  subtype: string | null;
+  /** Publicação de origem: Tormenta 20, Dragão Brasil, Ruff Ghanor… */
+  source: string | null;
+  /** Divindades que concedem o poder — vazio nos que não são concedidos. */
+  deities: string[];
+  /** Raças que podem escolher o poder; "Várias" quando não há raça fixa. */
+  races: string[];
+  requirements: string | null;
+  mp_cost: string | null;
+};
+
+/** Ficha completa do poder na biblioteca. */
+export type CatalogPowerDetail = CatalogPower & {
+  description: string;
+};
+
+export type PowerSearch = {
+  q?: string;
+  type?: CharacterPower['type'];
+  subtype?: string;
+  source?: string;
+  deity?: string;
+  race?: string;
+  page?: number;
+  per_page?: number;
+};
+
+export type PowerCatalogFilters = {
+  types: { value: CharacterPower['type']; label: string }[];
+  subtypes: { value: string; label: string; total: number }[];
+  sources: string[];
+  total: number;
+};
+
 /** Magia na biblioteca — o resumo que a lista do grimório exibe. */
 export type CatalogSpell = {
   id: number;

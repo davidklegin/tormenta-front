@@ -4,7 +4,8 @@ import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { charactersApi } from '@/api';
 import type { Character, CharacterPower } from '@/api/types';
-import { Button, Card, Chip, Input, SegmentedControl, Select, Sheet, Text } from '@/components/ui';
+import { Button, Card, Chip, Input, SegmentedControl, Select, Sheet, Text, Toast } from '@/components/ui';
+import { PowerCatalogSheet } from '@/components/character/PowerCatalogSheet';
 import { SheetScreen } from '@/components/character/SheetScreen';
 import { radius, spacing, useTheme } from '@/theme';
 
@@ -43,8 +44,10 @@ function PowersContent({ characterId, character }: { characterId: number; charac
 
   const [filter, setFilter] = useState<string>('todos');
   const [formOpen, setFormOpen] = useState(false);
+  const [catalogOpen, setCatalogOpen] = useState(false);
   const [editing, setEditing] = useState<CharacterPower | null>(null);
   const [detail, setDetail] = useState<CharacterPower | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ['character', characterId] });
@@ -86,13 +89,20 @@ function PowersContent({ characterId, character }: { characterId: number; charac
       />
 
       {canEdit ? (
-        <Button
-          label="Adicionar poder"
-          onPress={() => {
-            setEditing(null);
-            setFormOpen(true);
-          }}
-        />
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          {/* Escolher da biblioteca é o caminho normal; criar do zero fica ao
+              lado, para os poderes de classe e os que a mesa inventou. */}
+          <Button label="Buscar na biblioteca" onPress={() => setCatalogOpen(true)} style={{ flex: 1 }} />
+          <Button
+            label="Criar do zero"
+            variant="secondary"
+            onPress={() => {
+              setEditing(null);
+              setFormOpen(true);
+            }}
+            style={{ flex: 1 }}
+          />
+        </View>
       ) : null}
 
       {powers.length === 0 ? (
@@ -197,6 +207,17 @@ function PowersContent({ characterId, character }: { characterId: number; charac
         power={editing}
         onSaved={invalidate}
       />
+
+      <PowerCatalogSheet
+        visible={catalogOpen}
+        onClose={() => setCatalogOpen(false)}
+        character={character}
+        onImported={(added) =>
+          setAviso(added === 1 ? 'Poder adicionado à ficha.' : `${added} poderes adicionados à ficha.`)
+        }
+      />
+
+      {aviso ? <Toast message={aviso} tone="success" onDismiss={() => setAviso(null)} /> : null}
     </View>
   );
 }

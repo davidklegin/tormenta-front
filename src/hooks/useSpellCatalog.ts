@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { spellsApi } from '@/api';
 import type { CatalogSpell, SpellCatalogFilters, SpellSearch } from '@/api/types';
+import { useDebounced } from './useDebounced';
 
 const POR_PAGINA = 50;
 
@@ -42,16 +42,4 @@ export function useSpellCatalogFilters() {
     queryKey: ['spells', 'filters'],
     queryFn: spellsApi.filters,
   });
-}
-
-function useDebounced<T>(value: T, delay: number): T {
-  const [atrasado, setAtrasado] = useState(value);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setAtrasado(value), delay);
-
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-
-  return atrasado;
 }
