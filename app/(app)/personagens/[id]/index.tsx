@@ -10,7 +10,7 @@ import { ResourceManager } from '@/components/character/ResourceManager';
 import { SheetScreen } from '@/components/character/SheetScreen';
 import { VitalTracker } from '@/components/character/VitalTracker';
 import { useUpdateVitals } from '@/hooks/useCharacters';
-import { attributeValue, formatSlots, formatTibar, signed } from '@/rules';
+import { ATTRIBUTE_LABELS, attributeValue, formatSlots, formatTibar, signed } from '@/rules';
 import { spacing, useResponsive, useTheme, vitalColors } from '@/theme';
 
 /**
@@ -152,8 +152,11 @@ function CombatContent({ characterId, character }: { characterId: number; charac
           </View>
 
           <HelpNote collapsible source="Livro base, p. 106">
-            A Defesa é o número que o inimigo precisa alcançar para te acertar. Ela começa em 10 e soma sua
-            Destreza mais o que armadura e escudo derem.
+            {`A Defesa é o número que o inimigo precisa alcançar para te acertar. Ela começa em 10 e soma ${
+              character.defense.attribute === 'des'
+                ? 'sua Destreza'
+                : `o atributo escolhido na ficha, ${ATTRIBUTE_LABELS[character.defense.attribute].full},`
+            } mais o que armadura e escudo derem.`}
           </HelpNote>
         </View>
       </Card>

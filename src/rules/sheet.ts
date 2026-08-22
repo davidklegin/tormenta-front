@@ -10,27 +10,48 @@ import { halfLevel, trainingBonus } from './progression';
 
 export const DEFENSE_BASE = 10;
 
-/** Defesa = 10 + atributo + armadura + escudo (livro base, p. 106). */
-export function previewDefense(
-  attributeValue: number,
-  items: Pick<CharacterItem, 'category' | 'equipped' | 'defense_bonus' | 'armor_weight'>[],
-  otherBonus = 0,
-  attributeIsDexterity = true
-): number {
+type DefenseItem = Pick<CharacterItem, 'category' | 'equipped' | 'defense_bonus' | 'armor_weight'>;
+
+/** Armadura pesada equipada — é ela que anula o atributo na Defesa (p. 152). */
+export function wearsHeavyArmor(
+  items: Pick<CharacterItem, 'category' | 'equipped' | 'armor_weight'>[]
+): boolean {
+  return items.some(
+    (item) => item.equipped && item.category === 'armadura' && item.armor_weight === 'pesada'
+  );
+}
+
+/**
+ * Defesa = 10 + atributo + armadura + escudo (livro base, p. 106).
+ *
+ * O atributo aplicado é o escolhido na ficha; Destreza é o padrão do livro.
+ * `blockedByHeavyArmor` avisa que a armadura pesada zerou essa parcela, para a
+ * tela conseguir explicar o número em vez de só mostrá-lo.
+ */
+export function previewDefense(params: {
+  attributeValue: number;
+  items: DefenseItem[];
+  otherBonus?: number;
+}): { total: number; attributePart: number; fromItems: number; blockedByHeavyArmor: boolean } {
+  const { attributeValue: value, items, otherBonus = 0 } = params;
   const equipped = items.filter((item) => item.equipped);
 
-  const wearsHeavyArmor = equipped.some(
-    (item) => item.category === 'armadura' && item.armor_weight === 'pesada'
-  );
-
-  // Armadura pesada anula a Destreza na Defesa (p. 152).
-  const attributePart = wearsHeavyArmor && attributeIsDexterity ? 0 : attributeValue;
+  // Armadura pesada anula o atributo na Defesa (p. 152), seja ele qual for —
+  // as habilidades que trocam o atributo repetem a restrição. Mesma leitura do
+  // DefenseCalculator no servidor.
+  const blockedByHeavyArmor = wearsHeavyArmor(equipped);
+  const attributePart = blockedByHeavyArmor ? 0 : value;
 
   const fromItems = equipped
     .filter((item) => item.category === 'armadura' || item.category === 'escudo')
     .reduce((total, item) => total + (item.defense_bonus ?? 0), 0);
 
-  return DEFENSE_BASE + attributePart + fromItems + otherBonus;
+  return {
+    total: DEFENSE_BASE + attributePart + fromItems + otherBonus,
+    attributePart,
+    fromItems,
+    blockedByHeavyArmor,
+  };
 }
 
 /**
