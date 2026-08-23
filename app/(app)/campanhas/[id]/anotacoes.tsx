@@ -18,6 +18,7 @@ import {
   Text,
 } from '@/components/ui';
 import { PageHeader } from '@/components/layout';
+import { NoteReader } from '@/components/campaign/NoteReader';
 import {
   AttachmentStrip,
   NoteAttachments,
@@ -48,6 +49,7 @@ export default function CampaignNotesScreen() {
   const [query, setQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CampaignNote | null>(null);
+  const [lendo, setLendo] = useState<CampaignNote | null>(null);
 
   const notes = useCampaignNotes(campaignId, {
     q: query || undefined,
@@ -123,7 +125,14 @@ export default function CampaignNotesScreen() {
             <Pressable
               key={note.id}
               onPress={() => {
-                if (!note.can_edit) return;
+                // Ler não é editar: o jogador abre a anotação do mestre em
+                // modo leitura em vez de esbarrar num toque que não faz nada.
+                if (!note.can_edit) {
+                  setLendo(note);
+
+                  return;
+                }
+
                 setEditing(note);
                 setFormOpen(true);
               }}
@@ -174,6 +183,14 @@ export default function CampaignNotesScreen() {
           ))}
         </View>
       )}
+
+      <NoteReader
+        /* A versão recém-carregada, e não a que abriu o painel: um anexo que
+           chegou pelo tempo real precisa aparecer aqui dentro. */
+        note={lendo ? ((notes.data?.data ?? []).find((nota) => nota.id === lendo.id) ?? lendo) : null}
+        visible={lendo !== null}
+        onClose={() => setLendo(null)}
+      />
 
       <NoteForm
         key={editing?.id ?? `nova-${category}`}
