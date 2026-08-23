@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
+import { TurnAlertOverlay } from '@/components/combat';
 import { ShowcaseOverlay } from '@/components/showcase';
 import { useAuthStore } from '@/store/auth';
 import { useTheme } from '@/theme';
@@ -27,6 +28,12 @@ export default function AppLayout() {
       />
 
       <ShowcaseOverlay />
+
+      {/* "É a sua vez": chega pelo canal pessoal e precisa alcançar o jogador
+          em qualquer tela — na ficha, no grimório, no perfil. Por isso mora
+          aqui, e não na tela do combate, que é justamente a que ele não está
+          olhando quando a vez chega. */}
+      <TurnAlertOverlay />
     </View>
   );
 }

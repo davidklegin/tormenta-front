@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSessionStore } from '@/store/session';
 import type {
+  CombatState,
   ConditionsUpdatedEvent,
   MasterDashboard,
   ResourcesUpdatedEvent,
@@ -140,6 +141,12 @@ export function useCampaignChannel(campaignId: number | null | undefined, enable
       channel.listen('.stage.updated', (event: StageState) => {
         markEventReceived();
         queryClient.setQueryData<StageState>(['stage', campaignId], event);
+      });
+
+      // A ordem de iniciativa: como o palco, o evento traz o estado inteiro.
+      channel.listen('.combat.updated', (event: CombatState) => {
+        markEventReceived();
+        queryClient.setQueryData<CombatState>(['combat', campaignId], event);
       });
 
       // Anotações e membros mudam com pouca frequência: revalidar é suficiente.

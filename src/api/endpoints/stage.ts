@@ -1,5 +1,6 @@
 import { apiRequest, apiUpload } from '../client';
 import type {
+  CampaignNote,
   Envelope,
   NoteAttachment,
   StageItem,
@@ -42,6 +43,18 @@ export const stageApi = {
   removeItem: (campaignId: number, itemId: number) =>
     apiRequest<{ message: string }>(`/campaigns/${campaignId}/stage-items/${itemId}`, { method: 'DELETE' }),
 
+  /**
+   * Copia a peça para as anotações da campanha, onde a mesa inteira lê.
+   *
+   * Idempotente: chamar de novo atualiza a mesma anotação. Quem controla isso
+   * é o servidor, pelo `published_note_id` da peça — o app só toca no botão.
+   */
+  publishItem: (campaignId: number, itemId: number) =>
+    apiRequest<{ message: string; data: CampaignNote }>(
+      `/campaigns/${campaignId}/stage-items/${itemId}/publish`,
+      { method: 'POST' }
+    ),
+
   addAttachment: (campaignId: number, itemId: number, form: FormData) =>
     apiUpload<{ data: NoteAttachment }>(
       `/campaigns/${campaignId}/stage-items/${itemId}/attachments`,
@@ -80,4 +93,10 @@ export const stageApi = {
     apiRequest<Envelope<StageState>>(`/campaigns/${campaignId}/stage`, { method: 'DELETE' }).then(
       (r) => r.data
     ),
+
+  /** Manda para as anotações da campanha o que está no ar agora. */
+  publishLive: (campaignId: number) =>
+    apiRequest<{ message: string; data: CampaignNote }>(`/campaigns/${campaignId}/stage/publish`, {
+      method: 'POST',
+    }),
 };

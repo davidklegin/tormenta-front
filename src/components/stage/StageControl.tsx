@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
-import type { StageItem, StageSource } from '@/api/types';
+import { router } from 'expo-router';
+import type { StageItem, StageItemKind, StageSource, StageState } from '@/api/types';
 import {
   Button,
   Card,
@@ -10,22 +10,18 @@ import {
   Icon,
   Input,
   Loading,
-  Screen,
   SegmentedControl,
   Text,
 } from '@/components/ui';
-import { PageHeader } from '@/components/layout';
-import { RealtimeIndicator } from '@/components/campaign/RealtimeIndicator';
-import { StagePosterView } from '@/components/stage';
-import { useCampaign, useCampaignCharacters } from '@/hooks/useCampaigns';
+import { useCampaignCharacters } from '@/hooks/useCampaigns';
 import { useCharacter } from '@/hooks/useCharacters';
 import { usePowerCatalog } from '@/hooks/usePowerCatalog';
 import { useReference } from '@/hooks/useReference';
 import { useSpellCatalog } from '@/hooks/useSpellCatalog';
-import { useStage, useStageControls, useStageItems } from '@/hooks/useStage';
-import { useCampaignChannel } from '@/realtime/useCampaignChannel';
-import { useAuthStore } from '@/store/auth';
+import { useStage, useStageControls, useStageItemMutations, useStageItems } from '@/hooks/useStage';
 import { radius, spacing, stroke, useResponsive, useTheme } from '@/theme';
+import { StageItemForm } from './StageItemForm';
+import { StagePosterView } from './StagePosterView';
 
 type Fonte = 'acervo' | 'texto' | 'magias' | 'poderes' | 'itens' | 'fichas';
 
@@ -39,155 +35,119 @@ const FONTES: { value: Fonte; label: string }[] = [
 ];
 
 /**
- * Mesa de Controle: a tela que só o mestre olha.
+ * Mesa de Controle: cadastrar e exibir no mesmo lugar.
  *
- * O par dela é o palco (`/palco`), aberto na TV virada para os jogadores.
- * Aqui ficam as duas coisas que o mestre precisa durante a cena: o que está no
- * ar agora, desenhado igualzinho ao que a mesa está vendo, e o material todo à
- * mão para trocar em um toque.
+ * O acervo não é uma tela à parte porque as duas coisas acontecem juntas —
+ * durante a sessão o mestre cadastra o NPC que a mesa acabou de inventar um
+ * motivo para conhecer e o coloca no ar em seguida. Separá-las custaria uma
+ * navegação no meio da cena, que é exatamente o momento em que ninguém tem
+ * tempo para isso.
  *
- * A prévia usa o mesmo componente da projeção de propósito. Uma prévia
- * "aproximada" é pior que nenhuma: o mestre só descobriria a diferença pela
- * cara dos jogadores.
+ * O que está no ar fica sempre visível, desenhado com o MESMO componente da
+ * projeção: uma prévia aproximada seria pior que nenhuma — o mestre só
+ * descobriria a diferença pela cara dos jogadores.
  */
-export default function StageControlScreen() {
+export function StageControl({ campaignId }: { campaignId: number }) {
   const { colors } = useTheme();
   const { isDesktop } = useResponsive();
 
-  const params = useLocalSearchParams<{ id: string }>();
-  const campaignId = Number(params.id);
-
-  const isPlatformMaster = useAuthStore((estado) => estado.user?.is_master ?? false);
-
-  const campaign = useCampaign(campaignId);
-  const stage = useStage(campaignId, isPlatformMaster);
-  const { show, clear } = useStageControls(campaignId);
+  const stage = useStage(campaignId);
+  const { show, clear, publishLive } = useStageControls(campaignId);
 
   const [fonte, setFonte] = useState<Fonte>('acervo');
-
-  // O mestre também assina o canal: se ele exibir algo do celular, esta tela
-  // acompanha sem recarregar.
-  useCampaignChannel(campaignId, isPlatformMaster);
-
-  if (!isPlatformMaster) {
-    return (
-      <Screen>
-        <PageHeader title="Mesa de Controle" back />
-        <EmptyState
-          icon="mestre"
-          title="Área restrita"
-          description="A mesa de controle é do mestre da plataforma. O palco da sessão, esse você acompanha pela tela da campanha."
-        />
-      </Screen>
-    );
-  }
 
   const exibir = (source: StageSource) => show.mutate(source);
   const noAr = stage.data?.poster ?? null;
 
   return (
-    <Screen constrained={false}>
-      <PageHeader
-        title="Mesa de Controle"
-        subtitle={campaign.data?.name}
-        back
-        backLabel="Campanha"
-        actions={
-          <>
-            <RealtimeIndicator />
-            <Button
-              label="Acervo"
-              variant="secondary"
-              size="sm"
-              onPress={() => router.push(`/(app)/campanhas/${campaignId}/acervo`)}
-            />
-            <Button
-              label="Abrir palco"
-              variant="gold"
-              size="sm"
-              icon={<Icon name="mestre" size={16} color={colors.accentInk} />}
-              onPress={() => abrirPalco(campaignId)}
-            />
-          </>
-        }
-      />
-
-      <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: spacing.lg, alignItems: 'flex-start' }}>
-        {/* No ar agora — fixo à esquerda no desktop, que é onde a tela de
-            controle costuma ficar durante a sessão. */}
-        <View style={{ width: isDesktop ? 380 : '100%' }}>
-          <Card
-            title="No ar agora"
-            subtitle={
-              stage.data?.shown_by
-                ? `Exibido por ${stage.data.shown_by.nickname || stage.data.shown_by.name}`
-                : 'A tela dos jogadores'
-            }
-          >
-            <View style={{ gap: spacing.md }}>
-              {stage.isLoading ? (
-                <Loading inline label="Lendo o palco…" />
-              ) : noAr ? (
-                <StagePosterView poster={noAr} modo="previa" />
-              ) : (
-                <View
-                  style={{
-                    alignItems: 'center',
-                    gap: spacing.sm,
-                    paddingVertical: spacing.xl,
-                    borderRadius: radius.lg,
-                    borderWidth: stroke.hairline,
-                    borderStyle: 'dashed',
-                    borderColor: colors.border,
-                  }}
-                >
-                  <Icon name="mestre" size={28} color={colors.textSubtle} />
-                  <Text variant="small" tone="muted">
-                    Cortina fechada
-                  </Text>
-                </View>
-              )}
-
-              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                <Button
-                  label="Limpar tela"
-                  variant="secondary"
-                  size="sm"
-                  disabled={!noAr}
-                  loading={clear.isPending}
-                  onPress={() => clear.mutate()}
-                  style={{ flex: 1 }}
-                />
-                <Button
-                  label="Ver o palco"
-                  variant="ghost"
-                  size="sm"
-                  onPress={() => abrirPalco(campaignId)}
-                  style={{ flex: 1 }}
-                />
+    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: spacing.lg, alignItems: 'flex-start' }}>
+      {/* No ar agora — fixo à esquerda no desktop, que é onde a tela de
+          controle costuma ficar durante a sessão. */}
+      <View style={{ width: isDesktop ? 380 : '100%' }}>
+        <Card
+          title="No ar agora"
+          subtitle={
+            stage.data?.shown_by
+              ? `Exibido por ${stage.data.shown_by.nickname || stage.data.shown_by.name}`
+              : 'A tela dos jogadores'
+          }
+        >
+          <View style={{ gap: spacing.md }}>
+            {stage.isLoading ? (
+              <Loading inline label="Lendo o palco…" />
+            ) : noAr ? (
+              <StagePosterView poster={noAr} modo="previa" />
+            ) : (
+              <View
+                style={{
+                  alignItems: 'center',
+                  gap: spacing.sm,
+                  paddingVertical: spacing.xl,
+                  borderRadius: radius.lg,
+                  borderWidth: stroke.hairline,
+                  borderStyle: 'dashed',
+                  borderColor: colors.border,
+                }}
+              >
+                <Icon name="mestre" size={28} color={colors.textSubtle} />
+                <Text variant="small" tone="muted">
+                  Cortina fechada — nada sendo exibido
+                </Text>
               </View>
+            )}
+
+            <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
+              <Button
+                label="Tirar da tela"
+                variant="secondary"
+                size="sm"
+                disabled={!noAr}
+                loading={clear.isPending}
+                onPress={() => clear.mutate()}
+                style={{ flex: 1, minWidth: 140 }}
+              />
+              <Button
+                label="Ver o palco"
+                variant="ghost"
+                size="sm"
+                onPress={() => abrirPalco(campaignId)}
+                style={{ flex: 1, minWidth: 120 }}
+              />
             </View>
-          </Card>
-        </View>
 
-        {/* Fontes: tudo que pode ir ao ar. */}
-        <View style={{ flex: 1, gap: spacing.md, width: isDesktop ? undefined : '100%' }}>
-          <SegmentedControl
-            scrollable
-            value={fonte}
-            onChange={(valor) => setFonte(valor as Fonte)}
-            segments={FONTES}
-          />
-
-          {fonte === 'acervo' ? <FonteAcervo campaignId={campaignId} onExibir={exibir} /> : null}
-          {fonte === 'texto' ? <FonteTexto onExibir={exibir} enviando={show.isPending} /> : null}
-          {fonte === 'magias' ? <FonteMagias onExibir={exibir} /> : null}
-          {fonte === 'poderes' ? <FontePoderes onExibir={exibir} /> : null}
-          {fonte === 'itens' ? <FonteItens onExibir={exibir} /> : null}
-          {fonte === 'fichas' ? <FonteFichas campaignId={campaignId} onExibir={exibir} /> : null}
-        </View>
+            {/* Depois de a mesa ver, o material deixa de ser surpresa e vira
+                consulta: enviar para as anotações é o gesto seguinte. */}
+            <Button
+              label={publishLive.isSuccess ? 'Enviado às anotações' : 'Enviar para a campanha'}
+              variant="ghost"
+              size="sm"
+              disabled={!noAr}
+              loading={publishLive.isPending}
+              onPress={() => publishLive.mutate()}
+            />
+          </View>
+        </Card>
       </View>
-    </Screen>
+
+      {/* Fontes: tudo que pode ir ao ar. */}
+      <View style={{ flex: 1, gap: spacing.md, width: isDesktop ? undefined : '100%' }}>
+        <SegmentedControl
+          scrollable
+          value={fonte}
+          onChange={(valor) => setFonte(valor as Fonte)}
+          segments={FONTES}
+        />
+
+        {fonte === 'acervo' ? (
+          <FonteAcervo campaignId={campaignId} onExibir={exibir} stage={stage.data ?? null} />
+        ) : null}
+        {fonte === 'texto' ? <FonteTexto onExibir={exibir} enviando={show.isPending} /> : null}
+        {fonte === 'magias' ? <FonteMagias onExibir={exibir} /> : null}
+        {fonte === 'poderes' ? <FontePoderes onExibir={exibir} /> : null}
+        {fonte === 'itens' ? <FonteItens onExibir={exibir} /> : null}
+        {fonte === 'fichas' ? <FonteFichas campaignId={campaignId} onExibir={exibir} /> : null}
+      </View>
+    </View>
   );
 }
 
@@ -202,11 +162,13 @@ function Linha({
   titulo,
   detalhe,
   etiqueta,
+  noAr,
   onPress,
 }: {
   titulo: string;
   detalhe?: string | null;
   etiqueta?: string | null;
+  noAr?: boolean;
   onPress: () => void;
 }) {
   const { colors } = useTheme();
@@ -221,7 +183,9 @@ function Linha({
         backgroundColor: pressed ? colors.surfaceHover : colors.surface,
         borderRadius: radius.md,
         borderWidth: stroke.hairline,
-        borderColor: colors.border,
+        // A que está no ar se destaca na lista: no meio de vinte peças, é a
+        // única informação que o mestre procura de relance.
+        borderColor: noAr ? colors.success : colors.border,
         paddingVertical: spacing.sm,
         paddingHorizontal: spacing.md,
       })}
@@ -239,6 +203,7 @@ function Linha({
         ) : null}
       </View>
 
+      {noAr ? <Chip label="no ar" compact tone="success" /> : null}
       {etiqueta ? <Chip label={etiqueta} compact /> : null}
 
       <Text variant="caption" tone="primary" uppercase>
@@ -251,52 +216,130 @@ function Linha({
 function FonteAcervo({
   campaignId,
   onExibir,
+  stage,
 }: {
   campaignId: number;
   onExibir: (source: StageSource) => void;
+  stage: StageState | null;
 }) {
   const [q, setQ] = useState('');
-  const itens = useStageItems(campaignId, { q: q || undefined });
+  const [kind, setKind] = useState<string>('todos');
+  const [formOpen, setFormOpen] = useState(false);
+  const [editando, setEditando] = useState<StageItem | null>(null);
+
+  const itens = useStageItems(campaignId, {
+    q: q || undefined,
+    kind: kind === 'todos' ? undefined : (kind as StageItemKind),
+  });
 
   const lista = itens.data ?? [];
 
+  const abrirNova = () => {
+    setEditando(null);
+    setFormOpen(true);
+  };
+
   return (
     <View style={{ gap: spacing.sm }}>
-      <Input placeholder="Buscar no acervo…" value={q} onChangeText={setQ} autoCorrect={false} />
+      <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-end' }}>
+        <View style={{ flex: 1 }}>
+          <Input placeholder="Buscar no acervo…" value={q} onChangeText={setQ} autoCorrect={false} />
+        </View>
+        <Button label="Nova peça" size="sm" onPress={abrirNova} />
+      </View>
+
+      <SegmentedControl
+        scrollable
+        value={kind}
+        onChange={setKind}
+        segments={[
+          { value: 'todos', label: 'Todos' },
+          { value: 'npc', label: 'NPC' },
+          { value: 'place', label: 'Lugar' },
+          { value: 'image', label: 'Imagem' },
+          { value: 'handout', label: 'Documento' },
+          { value: 'text', label: 'Texto' },
+        ]}
+      />
 
       {itens.isLoading ? (
         <Loading inline label="Abrindo o acervo…" />
       ) : lista.length === 0 ? (
         <EmptyState
           icon="mestre"
-          title="Nada no acervo"
-          description="Cadastre NPCs, mapas e textos para exibir durante a sessão."
-          actionLabel="Abrir o acervo"
-          onAction={() => router.push(`/(app)/campanhas/${campaignId}/acervo`)}
+          title="Acervo vazio"
+          description="Cadastre NPCs, mapas, cartas e textos de leitura. Nada disso aparece para os jogadores até você exibir."
+          actionLabel="Cadastrar a primeira peça"
+          onAction={abrirNova}
         />
       ) : (
-        lista.map((peca) => <PecaDoAcervo key={peca.id} peca={peca} onExibir={onExibir} />)
+        lista.map((peca) => (
+          <PecaDoAcervo
+            key={peca.id}
+            campaignId={campaignId}
+            peca={peca}
+            stage={stage}
+            onExibir={onExibir}
+            onEditar={() => {
+              setEditando(peca);
+              setFormOpen(true);
+            }}
+          />
+        ))
       )}
+
+      <StageItemForm
+        key={editando?.id ?? `nova-${kind}`}
+        visible={formOpen}
+        onClose={() => setFormOpen(false)}
+        campaignId={campaignId}
+        /* A versão recém-carregada, e não a que abriu o formulário: anexar um
+           arquivo recarrega a lista, e é dali que sai a tira de anexos. */
+        item={editando ? (lista.find((item) => item.id === editando.id) ?? editando) : null}
+        defaultKind={kind === 'todos' ? 'npc' : (kind as StageItemKind)}
+      />
     </View>
   );
 }
 
 /**
- * A peça e, abaixo dela, seus arquivos.
+ * A peça, seus arquivos e o que dá para fazer com ela.
  *
  * Exibir a peça manda o conjunto — retrato, texto e dados. Exibir um arquivo
  * manda só ele, na tela toda: é a diferença entre apresentar o NPC e projetar
  * o mapa que ele desenhou.
  */
-function PecaDoAcervo({ peca, onExibir }: { peca: StageItem; onExibir: (source: StageSource) => void }) {
+function PecaDoAcervo({
+  campaignId,
+  peca,
+  stage,
+  onExibir,
+  onEditar,
+}: {
+  campaignId: number;
+  peca: StageItem;
+  stage: StageState | null;
+  onExibir: (source: StageSource) => void;
+  onEditar: () => void;
+}) {
+  const { colors } = useTheme();
+  const { remove, publish } = useStageItemMutations(campaignId);
+  const { clear } = useStageControls(campaignId);
+
   const anexos = peca.attachments ?? [];
 
+  const origem = stage?.source ?? null;
+  const pecaNoAr = origem?.type === 'stage_item' && origem.id === peca.id;
+  const arquivoNoAr = (id: number) => origem?.type === 'attachment' && origem.id === id;
+  const algoDestaPecaNoAr = pecaNoAr || anexos.some((anexo) => arquivoNoAr(anexo.id));
+
   return (
-    <View style={{ gap: spacing.xs }}>
+    <View style={{ gap: spacing.xs, marginBottom: spacing.sm }}>
       <Linha
         titulo={peca.title}
         detalhe={peca.subtitle}
         etiqueta={peca.kind_label}
+        noAr={pecaNoAr}
         onPress={() => onExibir({ source: 'stage_item', id: peca.id })}
       />
 
@@ -307,13 +350,72 @@ function PecaDoAcervo({ peca, onExibir }: { peca: StageItem; onExibir: (source: 
               key={anexo.id}
               label={anexo.caption || anexo.name}
               compact
-              tone={anexo.kind === 'image' ? 'arcane' : 'neutral'}
+              selected={arquivoNoAr(anexo.id)}
+              tone={arquivoNoAr(anexo.id) ? 'success' : anexo.kind === 'image' ? 'arcane' : 'neutral'}
               onPress={() => onExibir({ source: 'attachment', id: anexo.id })}
             />
           ))}
         </View>
       ) : null}
+
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: spacing.md,
+          paddingLeft: spacing.md,
+        }}
+      >
+        <Acao label="editar" onPress={onEditar} />
+
+        {/* Só aparece quando há o que tirar: um botão que não faz nada é pior
+            que a ausência dele. */}
+        {algoDestaPecaNoAr ? (
+          <Acao label="tirar da tela" onPress={() => clear.mutate()} carregando={clear.isPending} />
+        ) : null}
+
+        <Acao
+          label={peca.published_note_id ? 'atualizar na campanha' : 'enviar para a campanha'}
+          onPress={() => publish.mutate(peca.id)}
+          carregando={publish.isPending && publish.variables === peca.id}
+          tom={colors.primaryInk}
+        />
+
+        <View style={{ flex: 1 }} />
+
+        <Acao label="excluir" onPress={() => remove.mutate(peca.id)} tom={colors.textSubtle} />
+      </View>
     </View>
+  );
+}
+
+function Acao({
+  label,
+  onPress,
+  carregando,
+  tom,
+}: {
+  label: string;
+  onPress: () => void;
+  carregando?: boolean;
+  tom?: string;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={carregando}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={{ opacity: carregando ? 0.5 : 1 }}
+    >
+      <Text variant="small" style={{ color: tom ?? colors.textMuted }}>
+        {carregando ? 'enviando…' : label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -503,9 +605,7 @@ function FonteFichas({
               titulo: poder.name,
               detalhe: poder.type_label,
             }))}
-            onExibir={(id) =>
-              onExibir({ source: 'sheet', kind: 'power', character_id: escolhido, id })
-            }
+            onExibir={(id) => onExibir({ source: 'sheet', kind: 'power', character_id: escolhido, id })}
           />
           <GrupoDaFicha
             titulo="Magias"
@@ -514,9 +614,7 @@ function FonteFichas({
               titulo: magia.name,
               detalhe: magia.header,
             }))}
-            onExibir={(id) =>
-              onExibir({ source: 'sheet', kind: 'spell', character_id: escolhido, id })
-            }
+            onExibir={(id) => onExibir({ source: 'sheet', kind: 'spell', character_id: escolhido, id })}
           />
           <GrupoDaFicha
             titulo="Equipamento"
@@ -534,9 +632,7 @@ function FonteFichas({
               titulo: habilidade.name,
               detalhe: `${habilidade.level_acquired}º nível`,
             }))}
-            onExibir={(id) =>
-              onExibir({ source: 'sheet', kind: 'class_ability', character_id: escolhido, id })
-            }
+            onExibir={(id) => onExibir({ source: 'sheet', kind: 'class_ability', character_id: escolhido, id })}
           />
         </View>
       )}
@@ -561,12 +657,7 @@ function GrupoDaFicha({
         {titulo}
       </Text>
       {linhas.map((linha) => (
-        <Linha
-          key={linha.id}
-          titulo={linha.titulo}
-          detalhe={linha.detalhe}
-          onPress={() => onExibir(linha.id)}
-        />
+        <Linha key={linha.id} titulo={linha.titulo} detalhe={linha.detalhe} onPress={() => onExibir(linha.id)} />
       ))}
     </View>
   );
@@ -579,11 +670,11 @@ function GrupoDaFicha({
  * arrasta aquela aba para a TV e continua controlando desta. Sem isso, a única
  * forma seria abrir o app duas vezes e navegar até aqui de novo em cada uma.
  */
-function abrirPalco(campaignId: number): void {
+export function abrirPalco(campaignId: number): void {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     // Do endereço atual, trocando só o último segmento: assim o `baseUrl` do
     // app (que em produção é `/web`) entra sozinho, sem ser remontado aqui.
-    const url = window.location.href.replace(/\/controle\/?(\?.*)?$/, '/palco');
+    const url = window.location.href.replace(/\/(painel|controle|acervo)\/?(\?.*)?$/, '/palco');
 
     window.open(url, '_blank');
 

@@ -1,8 +1,11 @@
 import { Platform, Pressable, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ErrorState, Icon, Loading, Screen, Text } from '@/components/ui';
 import { StagePosterView } from '@/components/stage';
+import { InitiativeTracker } from '@/components/combat';
 import { useCampaign } from '@/hooks/useCampaigns';
+import { useCombat } from '@/hooks/useCombat';
 import { useStage } from '@/hooks/useStage';
 import { useCampaignChannel } from '@/realtime/useCampaignChannel';
 import { radius, spacing, stroke, useResponsive, useTheme } from '@/theme';
@@ -26,12 +29,14 @@ import { radius, spacing, stroke, useResponsive, useTheme } from '@/theme';
 export default function StageScreen() {
   const { colors } = useTheme();
   const { isPhone, height: altura } = useResponsive();
+  const insets = useSafeAreaInsets();
 
   const params = useLocalSearchParams<{ id: string }>();
   const campaignId = Number(params.id);
 
   const campaign = useCampaign(campaignId);
   const stage = useStage(campaignId);
+  const combat = useCombat(campaignId);
 
   // O canal é quem traz a mudança durante a sessão; a consulta acima só cobre
   // a abertura da tela e a queda do socket.
@@ -62,9 +67,11 @@ export default function StageScreen() {
   }
 
   const poster = stage.data?.poster ?? null;
+  const combate = combat.data ?? null;
 
   return (
-    <Screen constrained={false} scroll>
+    <View style={{ flex: 1 }}>
+      <Screen constrained={false} scroll>
       {/* Barra mínima: sair e tela cheia. Fica apagada de propósito — na TV
           ninguém deve ler isto, e no celular do jogador ainda é o caminho de
           volta. */}
@@ -108,7 +115,26 @@ export default function StageScreen() {
       <View style={{ minHeight: altura - 140, justifyContent: 'center', paddingVertical: isPhone ? spacing.md : spacing.xl }}>
         {poster ? <StagePosterView poster={poster} modo="palco" /> : <Cortina nome={campaign.data?.name} />}
       </View>
-    </Screen>
+      </Screen>
+
+      {/* A ordem de iniciativa fica POR CIMA, fixa no canto: durante o combate
+          ela é consultada a cada dez segundos, e rolar a tela atrás dela — ou
+          perdê-la quando o mestre troca o que está exibindo — devolveria a
+          pergunta "de quem é a vez?" para a mesa em voz alta. */}
+      {combate?.active ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: insets.top + spacing.xxl,
+            right: spacing.lg,
+            zIndex: 50,
+          }}
+          pointerEvents="none"
+        >
+          <InitiativeTracker combat={combate} compacto={isPhone} />
+        </View>
+      ) : null}
+    </View>
   );
 }
 

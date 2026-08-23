@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { View } from 'react-native';
 import { Image } from 'expo-image';
 import type { StagePoster } from '@/api/types';
@@ -31,7 +32,7 @@ export type StagePosterViewProps = {
  */
 export function StagePosterView({ poster, modo = 'palco' }: StagePosterViewProps) {
   const { colors } = useTheme();
-  const { isPhone, isDesktop } = useResponsive();
+  const { isPhone, isDesktop, width: larguraDaTela, height: alturaDaTela } = useResponsive();
 
   const palco = modo === 'palco';
   const grande = palco && !isPhone;
@@ -41,20 +42,71 @@ export function StagePosterView({ poster, modo = 'palco' }: StagePosterViewProps
   const imagemDomina = poster.kind === 'image' || poster.kind === 'place';
   const temTexto = Boolean(poster.body) || poster.facts.length > 0;
 
+  /**
+   * Altura da imagem no palco, medida a partir da janela e não de um número
+   * fixo: a TV da mesa e o celular do jogador têm alturas muito diferentes, e
+   * 520px que enchem um monitor sobram numa tela de 800px de altura.
+   *
+   * O desconto de 220px cobre a barra de sair, o título e a folga de rolagem.
+   */
+  const alturaUtil = Math.max(280, alturaDaTela - 220);
+  const alturaMaxima = !palco
+    ? 200
+    : imagemDomina
+      ? temTexto
+        ? Math.round(alturaUtil * 0.7)
+        : alturaUtil
+      : Math.round(alturaUtil * (isDesktop ? 0.8 : 0.45));
+
+  /**
+   * A proporção da imagem, conhecida só depois que ela carrega.
+   *
+   * Serve para a moldura acompanhar a foto em vez de a foto acompanhar a
+   * moldura: sem isso, um mapa 3:2 numa caixa quase quadrada aparece com duas
+   * faixas de papel — não está cortado, mas está menor do que poderia. Com a
+   * proporção em mãos, a altura encolhe até a imagem preencher a largura
+   * inteira, e o espaço que sobraria vira imagem.
+   */
+  const [proporcao, setProporcao] = useState<number | null>(null);
+
+  // Largura útil da coluna onde a imagem vai. Aproximada de propósito: erra
+  // por alguns pixels de padding, e o `contain` absorve a diferença.
+  const larguraDaColuna = duasColunasProvaveis(palco, isDesktop, imagemDomina, temTexto)
+    ? Math.min(Math.round(larguraDaTela * 0.42), 720)
+    : Math.min(larguraDaTela - 32, 1280);
+
+  const alturaDaImagem =
+    proporcao && proporcao > 0
+      ? Math.max(160, Math.min(alturaMaxima, Math.round(larguraDaColuna / proporcao)))
+      : alturaMaxima;
+
   const imagem = poster.image_url ? (
     <Image
       source={{ uri: poster.image_url }}
+      onLoad={(evento) => {
+        const { width, height } = evento.source ?? {};
+
+        if (width && height) setProporcao(width / height);
+      }}
       style={{
         width: '100%',
-        // No palco a imagem manda: sem altura fixa ela cresceria pelo aspecto
-        // e empurraria o título para fora da tela.
-        height: palco ? (imagemDomina ? 520 : 380) : 180,
+        height: alturaDaImagem,
         borderRadius: radius.lg,
         borderWidth: stroke.hairline,
         borderColor: colors.border,
         backgroundColor: colors.surfaceAlt,
       }}
-      contentFit={imagemDomina ? 'contain' : 'cover'}
+      /**
+       * `contain`, sempre — nem no retrato do NPC, nem na miniatura da prévia.
+       * O recorte automático do `cover` decide sozinho o que sai da imagem, e
+       * o que sai costuma ser justamente a borda do mapa ou o topo da cabeça
+       * do personagem. Aqui a imagem aparece inteira e usa todo o espaço que a
+       * tela oferece; as faixas que sobram ficam na cor do papel.
+       *
+       * A URL é a do arquivo como foi enviado: o app não redimensiona no
+       * upload (ver utils/imagem.ts), então o que a TV mostra é o original.
+       */
+      contentFit="contain"
       transition={200}
       accessibilityLabel={poster.title}
     />
@@ -197,12 +249,14 @@ export function StagePosterView({ poster, modo = 'palco' }: StagePosterViewProps
 
   // Retrato ao lado do texto: só quando há os dois e a tela comporta as duas
   // colunas. No celular tudo empilha, que é o único arranjo legível ali.
-  const duasColunas = palco && isDesktop && imagem !== null && !imagemDomina && temTexto;
+  const duasColunas = imagem !== null && duasColunasProvaveis(palco, isDesktop, imagemDomina, temTexto);
 
   if (duasColunas) {
     return (
       <View style={{ flexDirection: 'row', gap: spacing.xl, alignItems: 'flex-start' }}>
-        <View style={{ width: 380 }}>{imagem}</View>
+        {/* A coluna acompanha a janela: numa TV larga, uma largura fixa
+            deixaria o retrato pequeno no canto com metade da tela vazia. */}
+        <View style={{ width: larguraDaColuna }}>{imagem}</View>
         {conteudo}
       </View>
     );
@@ -291,4 +345,21 @@ function ArquivoDoCartaz({
       </View>
     </View>
   );
+}
+
+/**
+ * O cartaz vai cair no arranjo de duas colunas?
+ *
+ * A conta é a mesma que decide o layout mais abaixo; ela vive aqui em cima
+ * porque a largura da coluna precisa ser conhecida antes, para dimensionar a
+ * imagem. Duas cópias da regra divergiriam no primeiro ajuste — esta função é
+ * a única dona dela.
+ */
+function duasColunasProvaveis(
+  palco: boolean,
+  isDesktop: boolean,
+  imagemDomina: boolean,
+  temTexto: boolean
+): boolean {
+  return palco && isDesktop && !imagemDomina && temTexto;
 }

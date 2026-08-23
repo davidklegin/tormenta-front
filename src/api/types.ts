@@ -780,6 +780,45 @@ export type SummaryUpdatedEvent = {
   class_label: string;
 };
 
+// ------------------------------------------------------ ordem de iniciativa
+
+/**
+ * Uma linha da ordem de iniciativa.
+ *
+ * Metade dos combatentes não é ficha: o goblin nº 3 entra com nome e número, e
+ * `is_npc` diz qual é qual. `user_id` existe para o app saber, sem consultar
+ * nada, que aquela vez é do jogador que está olhando a tela.
+ */
+export type CombatEntry = {
+  id: string;
+  name: string;
+  initiative: number;
+  character_id: number | null;
+  user_id: number | null;
+  avatar_url: string | null;
+  is_npc: boolean;
+};
+
+export type CombatState = {
+  active: boolean;
+  round: number;
+  turn_index: number;
+  entries: CombatEntry[];
+  current: CombatEntry | null;
+  next: CombatEntry | null;
+  updated_at: string | null;
+};
+
+/** Chegada de um aviso de turno pelo canal pessoal do usuário. */
+export type CombatTurnEvent = {
+  /** 'current' é a vez agora; 'next', o aviso de que ela vem em seguida. */
+  kind: 'current' | 'next';
+  round: number;
+  campaign: { id: number; name: string };
+  entry: CombatEntry;
+  at: string;
+};
+
 // ------------------------------------------------- acervo e palco da mesa
 
 /** O que uma peça do acervo é — muda o filtro da tela e o desenho do cartaz. */
@@ -804,6 +843,8 @@ export type StageItem = {
   body: string | null;
   secret_notes: string | null;
   facts: StageFact[];
+  /** Anotação da campanha criada a partir desta peça — null enquanto não foi enviada. */
+  published_note_id: number | null;
   attachments?: NoteAttachment[];
   sort_order: number;
   created_at: string | null;

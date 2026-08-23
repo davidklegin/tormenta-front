@@ -129,7 +129,7 @@ export default function CampaignScreen() {
                 label="Mesa de Controle"
                 variant="secondary"
                 size="sm"
-                onPress={() => router.push(`/(app)/campanhas/${campaignId}/controle`)}
+                onPress={() => router.push(`/(app)/campanhas/${campaignId}/painel?aba=mesa`)}
               />
             ) : null}
             {isMaster ? (
@@ -472,9 +472,9 @@ function PalcoDaSessao({
           />
           {isPlatformMaster ? (
             <Button
-              label="Acervo"
+              label="Controlar"
               variant="ghost"
-              onPress={() => router.push(`/(app)/campanhas/${campaignId}/acervo`)}
+              onPress={() => router.push(`/(app)/campanhas/${campaignId}/painel?aba=mesa`)}
               style={{ flex: 1 }}
             />
           ) : null}

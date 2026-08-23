@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { stageApi } from '@/api';
 import type { StageItem, StageItemKind, StageSource, StageState } from '@/api/types';
 import { useSessionStore } from '@/store/session';
+import { campaignKeys } from './useCampaigns';
 
 export const stageKeys = {
   state: (campaignId: number) => ['stage', campaignId] as const,
@@ -62,7 +63,21 @@ export function useStageItemMutations(campaignId: number) {
     onSuccess: invalidate,
   });
 
-  return { create, update, remove, invalidate };
+  /**
+   * "Enviar para a campanha".
+   *
+   * Invalida o acervo (a peça passa a ter `published_note_id`, e o botão muda
+   * de rótulo) e as anotações, que acabaram de ganhar uma.
+   */
+  const publish = useMutation({
+    mutationFn: (id: number) => stageApi.publishItem(campaignId, id),
+    onSuccess: () => {
+      invalidate();
+      void queryClient.invalidateQueries({ queryKey: campaignKeys.notes(campaignId) });
+    },
+  });
+
+  return { create, update, remove, publish, invalidate };
 }
 
 /**
@@ -89,5 +104,13 @@ export function useStageControls(campaignId: number) {
     onSuccess: aplicar,
   });
 
-  return { show, clear };
+  const publishLive = useMutation({
+    mutationFn: () => stageApi.publishLive(campaignId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: campaignKeys.notes(campaignId) });
+      void queryClient.invalidateQueries({ queryKey: stageKeys.items(campaignId) });
+    },
+  });
+
+  return { show, clear, publishLive };
 }
