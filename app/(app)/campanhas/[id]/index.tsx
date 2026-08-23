@@ -29,6 +29,7 @@ import {
   useJoinPublicCampaign,
   useUpdateCampaign,
 } from '@/hooks/useCampaigns';
+import { useNextSession } from '@/hooks/useCampaignSessions';
 import { useStage } from '@/hooks/useStage';
 import { useCampaignChannel } from '@/realtime/useCampaignChannel';
 import { useAuthStore } from '@/store/auth';
@@ -167,6 +168,11 @@ export default function CampaignScreen() {
           responde, e um card convidando o visitante a abrir uma tela que ele
           não pode ver seria só uma porta trancada. */}
       {data.is_member ? <PalcoDaSessao campaignId={campaignId} isPlatformMaster={isPlatformMaster} /> : null}
+
+      {/* Quando a mesa joga. Aparece para todo mundo que alcança a campanha,
+          inclusive o visitante do catálogo: é o dado que decide se vale
+          entrar. */}
+      <ProximaSessao campaignId={campaignId} podeMarcar={isMaster} />
 
       {/* Anotações em destaque: é o que a mesa mais consulta entre as sessões,
           então mostra o conteúdo, e não só um botão para outro lugar. */}
@@ -416,6 +422,69 @@ function NotasDaCampanha({
       </View>
     </Card>
   );
+}
+
+/**
+ * A próxima sessão da mesa, no alto da tela da campanha.
+ *
+ * Mostra a data em vez de um botão "abrir calendário" pelo mesmo motivo das
+ * anotações logo abaixo: a resposta cabe em uma linha, e obrigar uma navegação
+ * para ler uma linha é o tipo de coisa que faz ninguém conferir.
+ */
+function ProximaSessao({ campaignId, podeMarcar }: { campaignId: number; podeMarcar: boolean }) {
+  const { colors } = useTheme();
+
+  const proximas = useNextSession(campaignId);
+  const sessao = proximas.data?.[0] ?? null;
+
+  return (
+    <Card>
+      <View style={{ gap: spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Icon name="campanhas" size={20} color={colors.textMuted} />
+          <Text variant="heading" style={{ flex: 1 }}>
+            Próxima sessão
+          </Text>
+        </View>
+
+        {proximas.isLoading ? (
+          <Loading inline label="Consultando o calendário…" />
+        ) : sessao ? (
+          <View style={{ gap: 2 }}>
+            <Text variant="bodyStrong" numberOfLines={1}>
+              {sessao.title}
+            </Text>
+            <Text variant="small" tone="secondary">
+              {quando(sessao.starts_at)}
+              {sessao.location ? ` · ${sessao.location}` : ''}
+            </Text>
+          </View>
+        ) : (
+          <Text variant="small" tone="muted">
+            {podeMarcar
+              ? 'Nada marcado. Escolha uma data para a mesa se organizar.'
+              : 'O mestre ainda não marcou a próxima sessão.'}
+          </Text>
+        )}
+
+        <Button
+          label={sessao ? 'Ver o calendário' : podeMarcar ? 'Marcar sessão' : 'Ver o calendário'}
+          variant={sessao ? 'secondary' : 'primary'}
+          onPress={() => router.push(`/(app)/campanhas/${campaignId}/calendario`)}
+          fullWidth
+        />
+      </View>
+    </Card>
+  );
+}
+
+/** "Sexta-feira, 04 de setembro · 20:00" — como a mesa combina. */
+function quando(iso: string): string {
+  const data = new Date(iso);
+  const dia = data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+  const hora = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)} · ${hora}`;
 }
 
 /**

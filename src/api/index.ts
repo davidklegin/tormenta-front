@@ -17,6 +17,7 @@ export { combatApi, type CombatEntryInput } from './endpoints/combat';
 export type { CharacterPayload, VitalsPayload, VitalsResponse } from './endpoints/characters';
 export { powersApi } from './endpoints/powers';
 export { referenceApi } from './endpoints/reference';
+export { sessionsApi, type SessionPayload } from './endpoints/sessions';
 export { showcaseApi } from './endpoints/showcase';
 export { spellsApi } from './endpoints/spells';
 export { stageApi } from './endpoints/stage';

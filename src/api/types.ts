@@ -780,6 +780,33 @@ export type SummaryUpdatedEvent = {
   class_label: string;
 };
 
+// ------------------------------------------------------------- calendário
+
+export type SessionStatus = 'scheduled' | 'done' | 'canceled';
+
+/**
+ * Uma sessão marcada no calendário da mesa.
+ *
+ * `starts_at` vem sempre com fuso (ISO 8601 com offset): o app mostra no
+ * horário de quem está olhando, e uma data sem offset seria lida como local em
+ * cada aparelho — a sessão das 20h apareceria em três horários diferentes numa
+ * mesa com gente em fusos distintos.
+ */
+export type CampaignSession = {
+  id: number;
+  campaign_id: number;
+  title: string;
+  starts_at: string;
+  duration_minutes: number | null;
+  location: string | null;
+  notes: string | null;
+  status: SessionStatus;
+  status_label: string;
+  created_by?: { id: number; name: string; nickname: string | null };
+  can_edit: boolean;
+  created_at: string | null;
+};
+
 // ------------------------------------------------------ ordem de iniciativa
 
 /**

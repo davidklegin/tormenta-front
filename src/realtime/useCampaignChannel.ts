@@ -159,6 +159,15 @@ export function useCampaignChannel(campaignId: number | null | undefined, enable
       channel.listen('.campaign.note.deleted', () => {
         queryClient.invalidateQueries({ queryKey: ['campaign-notes', campaignId] });
       });
+      // Calendário: o aviso não traz a sessão, e sim o "algo mudou" — a lista
+      // vem filtrada pelo mês que está na tela, e a sessão nova pode não ser
+      // daquele mês.
+      for (const acao of ['created', 'updated', 'deleted']) {
+        channel.listen(`.campaign.session.${acao}`, () => {
+          queryClient.invalidateQueries({ queryKey: ['campaign-sessions', campaignId] });
+        });
+      }
+
       channel.listen('.campaign.member.joined', () => {
         queryClient.invalidateQueries({ queryKey: ['campaign', campaignId] });
         queryClient.invalidateQueries({ queryKey: ['dashboard', campaignId] });
