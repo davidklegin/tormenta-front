@@ -84,7 +84,7 @@ export function AttachmentViewer({
           <View style={{ flex: 1, backgroundColor: colors.surfaceAlt }}>
             {/* A chave força um visualizador novo a cada anexo: sem ela, trocar
                 de arquivo reaproveitaria o WebView com o conteúdo anterior. */}
-            <Conteudo key={anexo.id} anexo={anexo} />
+            <AttachmentPreview key={anexo.id} attachment={anexo} />
           </View>
 
           <Rodape
@@ -239,7 +239,15 @@ function Rodape({
   );
 }
 
-function Conteudo({ anexo }: { anexo: NoteAttachment }) {
+/**
+ * O conteúdo de um anexo, desenhado sem moldura nem navegação.
+ *
+ * Exportado porque tem um segundo consumidor: o palco da sessão projeta a
+ * carta em PDF e toca o áudio da cena com este mesmo desenho. Um visualizador
+ * de PDF diferente na TV significaria, na prática, um dos dois quebrado sem
+ * ninguém notar.
+ */
+export function AttachmentPreview({ attachment: anexo }: { attachment: NoteAttachment }) {
   const { colors, isDark } = useTheme();
 
   switch (anexo.kind) {

@@ -5,6 +5,7 @@ import type {
   ConditionsUpdatedEvent,
   MasterDashboard,
   ResourcesUpdatedEvent,
+  StageState,
   SummaryUpdatedEvent,
   VitalsUpdatedEvent,
 } from '@/api/types';
@@ -131,6 +132,14 @@ export function useCampaignChannel(campaignId: number | null | undefined, enable
           level: event.level,
           class_label: event.class_label,
         }));
+      });
+
+      // O palco da mesa: o evento traz o estado inteiro, então ele substitui
+      // o que está no cache. Vale para todo mundo que assina o canal — a TV
+      // virada para os jogadores e o celular de cada um deles.
+      channel.listen('.stage.updated', (event: StageState) => {
+        markEventReceived();
+        queryClient.setQueryData<StageState>(['stage', campaignId], event);
       });
 
       // Anotações e membros mudam com pouca frequência: revalidar é suficiente.

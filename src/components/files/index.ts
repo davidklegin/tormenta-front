@@ -1,5 +1,5 @@
 export { AttachmentStrip } from './AttachmentStrip';
-export { AttachmentViewer } from './AttachmentViewer';
+export { AttachmentPreview, AttachmentViewer } from './AttachmentViewer';
 export {
   NoteAttachments,
   buildAttachmentForm,

@@ -29,6 +29,9 @@ import {
   useJoinPublicCampaign,
   useUpdateCampaign,
 } from '@/hooks/useCampaigns';
+import { useStage } from '@/hooks/useStage';
+import { useCampaignChannel } from '@/realtime/useCampaignChannel';
+import { useAuthStore } from '@/store/auth';
 import { iconeDoAnexo } from '@/utils/arquivo';
 import { radius, spacing, useTheme } from '@/theme';
 
@@ -89,6 +92,10 @@ export default function CampaignScreen() {
   const joinPublic = useJoinPublicCampaign();
   const updateCampaign = useUpdateCampaign(campaignId);
 
+  // Permissão MASTER da plataforma — diferente de `campaign.is_master`, que é
+  // o papel de mestre desta mesa.
+  const isPlatformMaster = useAuthStore((estado) => estado.user?.is_master ?? false);
+
   if (campaign.isLoading) {
     return (
       <Screen>
@@ -116,15 +123,25 @@ export default function CampaignScreen() {
         subtitle={data.description ?? undefined}
         back
         actions={
-          isMaster ? (
-            <Button
-              label="Painel do Mestre"
-              variant="gold"
-              size="sm"
-              icon={<Icon name="mestre" size={16} color={colors.accentInk} />}
-              onPress={() => router.push(`/(app)/campanhas/${campaignId}/painel`)}
-            />
-          ) : undefined
+          <>
+            {isPlatformMaster ? (
+              <Button
+                label="Mesa de Controle"
+                variant="secondary"
+                size="sm"
+                onPress={() => router.push(`/(app)/campanhas/${campaignId}/controle`)}
+              />
+            ) : null}
+            {isMaster ? (
+              <Button
+                label="Painel do Mestre"
+                variant="gold"
+                size="sm"
+                icon={<Icon name="mestre" size={16} color={colors.accentInk} />}
+                onPress={() => router.push(`/(app)/campanhas/${campaignId}/painel`)}
+              />
+            ) : null}
+          </>
         }
       />
 
@@ -145,6 +162,11 @@ export default function CampaignScreen() {
           </View>
         </Card>
       ) : null}
+
+      {/* O palco só aparece para quem senta à mesa: é o que o servidor
+          responde, e um card convidando o visitante a abrir uma tela que ele
+          não pode ver seria só uma porta trancada. */}
+      {data.is_member ? <PalcoDaSessao campaignId={campaignId} isPlatformMaster={isPlatformMaster} /> : null}
 
       {/* Anotações em destaque: é o que a mesa mais consulta entre as sessões,
           então mostra o conteúdo, e não só um botão para outro lugar. */}
@@ -391,6 +413,72 @@ function NotasDaCampanha({
           onPress={() => router.push(`/(app)/campanhas/${campaignId}/anotacoes`)}
           fullWidth
         />
+      </View>
+    </Card>
+  );
+}
+
+/**
+ * O palco da sessão, visto da tela da campanha.
+ *
+ * Serve a dois leitores. Para o jogador é a porta de entrada: um toque e ele
+ * vê no próprio aparelho o que o mestre está projetando. Para o mestre é o
+ * atalho para a tela que ele deixa aberta na TV.
+ *
+ * Mostrar aqui o que está no ar (e não só um botão) é de propósito: quem chega
+ * atrasado à mesa descobre que há algo sendo exibido sem precisar perguntar.
+ */
+function PalcoDaSessao({
+  campaignId,
+  isPlatformMaster,
+}: {
+  campaignId: number;
+  isPlatformMaster: boolean;
+}) {
+  const { colors } = useTheme();
+
+  const stage = useStage(campaignId);
+
+  // Assinar aqui mantém o cartão em dia enquanto a tela da campanha estiver
+  // aberta — é a mesma assinatura que o palco usa, e o Echo reaproveita a
+  // conexão.
+  useCampaignChannel(campaignId, true);
+
+  const noAr = stage.data?.poster ?? null;
+
+  return (
+    <Card>
+      <View style={{ gap: spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Icon name="mestre" size={20} color={colors.textMuted} />
+          <Text variant="heading" style={{ flex: 1 }}>
+            Palco da sessão
+          </Text>
+          {noAr ? <Chip label="ao vivo" compact tone="success" /> : null}
+        </View>
+
+        <Text variant="small" tone={noAr ? 'default' : 'muted'} numberOfLines={2}>
+          {noAr
+            ? `${noAr.kind_label}: ${noAr.title}`
+            : 'Nada sendo exibido agora. O mestre projeta imagens, textos, magias e itens aqui.'}
+        </Text>
+
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <Button
+            label="Abrir o palco"
+            variant={noAr ? 'primary' : 'secondary'}
+            onPress={() => router.push(`/(app)/campanhas/${campaignId}/palco`)}
+            style={{ flex: 1 }}
+          />
+          {isPlatformMaster ? (
+            <Button
+              label="Acervo"
+              variant="ghost"
+              onPress={() => router.push(`/(app)/campanhas/${campaignId}/acervo`)}
+              style={{ flex: 1 }}
+            />
+          ) : null}
+        </View>
       </View>
     </Card>
   );

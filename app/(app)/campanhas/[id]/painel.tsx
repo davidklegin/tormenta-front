@@ -17,6 +17,7 @@ import { RealtimeIndicator } from '@/components/campaign/RealtimeIndicator';
 import { PageHeader, ResponsiveGrid } from '@/components/layout';
 import { useMasterDashboard } from '@/hooks/useCampaigns';
 import { useCampaignChannel } from '@/realtime/useCampaignChannel';
+import { useAuthStore } from '@/store/auth';
 import { spacing, useResponsive, useTheme } from '@/theme';
 
 type SortMode = 'name' | 'hp' | 'conditions';
@@ -39,6 +40,7 @@ export default function MasterDashboardScreen() {
   const { isDesktop } = useResponsive();
 
   const dashboard = useMasterDashboard(campaignId);
+  const isPlatformMaster = useAuthStore((estado) => estado.user?.is_master ?? false);
 
   // Assina o canal privado da campanha: daqui em diante as mudanças de PV, PM
   // e condições chegam sozinhas.
@@ -110,6 +112,16 @@ export default function MasterDashboardScreen() {
         actions={
           <>
             <RealtimeIndicator />
+            {/* O painel e a mesa de controle andam juntos durante a sessão:
+                um mostra como a mesa está, o outro o que ela está vendo. */}
+            {isPlatformMaster ? (
+              <Button
+                label="Mesa de Controle"
+                variant="gold"
+                size="sm"
+                onPress={() => router.push(`/(app)/campanhas/${campaignId}/controle`)}
+              />
+            ) : null}
             <Button
               label="Campanha"
               variant="secondary"

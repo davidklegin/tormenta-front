@@ -18,4 +18,5 @@ export { powersApi } from './endpoints/powers';
 export { referenceApi } from './endpoints/reference';
 export { showcaseApi } from './endpoints/showcase';
 export { spellsApi } from './endpoints/spells';
+export { stageApi } from './endpoints/stage';
 export type * from './types';

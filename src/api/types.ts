@@ -780,6 +780,85 @@ export type SummaryUpdatedEvent = {
   class_label: string;
 };
 
+// ------------------------------------------------- acervo e palco da mesa
+
+/** O que uma peça do acervo é — muda o filtro da tela e o desenho do cartaz. */
+export type StageItemKind = 'npc' | 'place' | 'image' | 'handout' | 'text';
+
+/** Linha de ficha de uma peça: "ND 3", "PV 25", "Autor: irmão Tulio". */
+export type StageFact = { label: string; value: string };
+
+/**
+ * Peça do acervo do mestre.
+ *
+ * Só o MASTER recebe este objeto — inclusive `secret_notes`, que existe
+ * justamente para não ir ao palco.
+ */
+export type StageItem = {
+  id: number;
+  campaign_id: number;
+  kind: StageItemKind;
+  kind_label: string;
+  title: string;
+  subtitle: string | null;
+  body: string | null;
+  secret_notes: string | null;
+  facts: StageFact[];
+  attachments?: NoteAttachment[];
+  sort_order: number;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+/**
+ * O cartaz: o formato único de tudo que vai ao palco.
+ *
+ * Vem montado do servidor, venha de onde vier — acervo, biblioteca de magias
+ * ou ficha de um jogador. A tela de exibição desenha isto e nada mais, então
+ * uma fonte nova no controle não pede tela nova na TV.
+ */
+export type StagePoster = {
+  kind: StageItemKind | 'spell' | 'power' | 'item' | 'class_ability';
+  kind_label: string;
+  title: string;
+  subtitle: string | null;
+  body: string | null;
+  facts: StageFact[];
+  tags: string[];
+  image_url: string | null;
+  gallery: { id: number; url: string; caption: string | null }[];
+  file: {
+    id: number;
+    url: string;
+    name: string;
+    kind: AttachmentKind;
+    kind_label: string;
+    mime_type: string | null;
+    size_bytes: number | null;
+  } | null;
+  /** Só nas magias — os aprimoramentos, no formato da ficha. */
+  enhancements?: { cost: string; text: string }[];
+};
+
+/** O que está no palco da mesa agora. `poster` nulo é a cortina fechada. */
+export type StageState = {
+  live: boolean;
+  poster: StagePoster | null;
+  source: { type: string; id: number | null } | null;
+  shown_by: { id: number; name: string; nickname: string | null } | null;
+  shown_at: string | null;
+};
+
+/** O que a mesa de controle manda exibir — sempre a referência, nunca o conteúdo. */
+export type StageSource =
+  | { source: 'stage_item'; id: number }
+  | { source: 'attachment'; id: number }
+  | { source: 'text'; body: string; title?: string }
+  | { source: 'catalog_spell'; id: number }
+  | { source: 'catalog_power'; id: number }
+  | { source: 'catalog_item'; id: number }
+  | { source: 'sheet'; kind: ShowcaseKind; character_id: number; id: number };
+
 // ------------------------------------------------------ exibir aos outros
 
 /** Os quatro tipos de item da ficha que podem ser apontados aos outros. */
