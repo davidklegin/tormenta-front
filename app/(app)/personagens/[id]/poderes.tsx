@@ -6,6 +6,7 @@ import { charactersApi } from '@/api';
 import type { Character, CharacterPower, CharacterPowerEffect } from '@/api/types';
 import { Button, Card, Chip, Input, SegmentedControl, Select, Sheet, Text, Toast } from '@/components/ui';
 import { PowerCatalogSheet } from '@/components/character/PowerCatalogSheet';
+import { ShowcaseButton } from '@/components/showcase';
 import { SheetScreen } from '@/components/character/SheetScreen';
 import { radius, spacing, useTheme } from '@/theme';
 
@@ -214,6 +215,8 @@ function PowersContent({ characterId, character }: { characterId: number; charac
             <Text variant="body" tone="secondary">
               {detail.description || 'Sem descrição.'}
             </Text>
+
+            <ShowcaseButton kind="power" characterId={characterId} resourceId={detail.id} />
 
             {canEdit ? (
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>

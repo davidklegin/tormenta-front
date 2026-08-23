@@ -16,5 +16,6 @@ export { charactersApi } from './endpoints/characters';
 export type { CharacterPayload, VitalsPayload, VitalsResponse } from './endpoints/characters';
 export { powersApi } from './endpoints/powers';
 export { referenceApi } from './endpoints/reference';
+export { showcaseApi } from './endpoints/showcase';
 export { spellsApi } from './endpoints/spells';
 export type * from './types';

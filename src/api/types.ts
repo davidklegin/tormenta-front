@@ -779,3 +779,41 @@ export type SummaryUpdatedEvent = {
   level: number;
   class_label: string;
 };
+
+// ------------------------------------------------------ exibir aos outros
+
+/** Os quatro tipos de item da ficha que podem ser apontados aos outros. */
+export type ShowcaseKind = 'power' | 'spell' | 'item' | 'class_ability';
+
+/**
+ * O conteúdo exibido, no mesmo formato da ficha.
+ *
+ * A união é discriminada por `kind`: dentro do modal, checar `kind === 'spell'`
+ * já estreita `payload` para `CharacterSpell`, e o TypeScript cobra o caso que
+ * faltar quando um quinto tipo aparecer.
+ */
+export type ShowcaseContent =
+  | { kind: 'power'; payload: CharacterPower }
+  | { kind: 'spell'; payload: CharacterSpell }
+  | { kind: 'item'; payload: CharacterItem }
+  | { kind: 'class_ability'; payload: CharacterClassAbility };
+
+/** Chegada de um "Exibir aos outros" pelo canal da plataforma. */
+export type ShowcaseEvent = ShowcaseContent & {
+  /** Único por exibição — é a chave do aviso e evita repetir o mesmo duas vezes. */
+  id: string;
+  kind_label: string;
+  title: string;
+  actor: {
+    id: number;
+    name: string;
+    nickname: string | null;
+    avatar_url: string | null;
+  };
+  character: {
+    id: number;
+    name: string;
+    avatar_url: string | null;
+  };
+  shared_at: string;
+};

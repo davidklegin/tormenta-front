@@ -4,8 +4,21 @@ import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, charactersApi } from '@/api';
 import type { Character, CharacterItem } from '@/api/types';
-import { Button, Card, Chip, HelpNote, Icon, Input, ProgressBar, Select, Sheet, Text } from '@/components/ui';
+import {
+  Button,
+  Card,
+  Chip,
+  DetailRow,
+  HelpNote,
+  Icon,
+  Input,
+  ProgressBar,
+  Select,
+  Sheet,
+  Text,
+} from '@/components/ui';
 import { SheetScreen } from '@/components/character/SheetScreen';
+import { ShowcaseButton } from '@/components/showcase';
 import { useReference } from '@/hooks/useReference';
 import { formatSlots, formatTibar } from '@/rules';
 import { radius, spacing, useTheme } from '@/theme';
@@ -37,6 +50,7 @@ function EquipmentContent({ characterId, character }: { characterId: number; cha
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CharacterItem | null>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
   const [moneyOpen, setMoneyOpen] = useState(false);
   const [money, setMoney] = useState(String(character.money_tibar));
 
@@ -62,6 +76,13 @@ function EquipmentContent({ characterId, character }: { characterId: number; cha
       setMoneyOpen(false);
     },
   });
+
+  // O detalhe sai da lista, e não de uma cópia no estado: equipar o item ou
+  // mudar a quantidade atualiza o painel aberto sem fechar e abrir de novo.
+  const detail = useMemo(
+    () => character.items.find((item) => item.id === detailId) ?? null,
+    [character.items, detailId]
+  );
 
   const grouped = useMemo(() => {
     const groups: Record<string, CharacterItem[]> = {};
@@ -188,11 +209,9 @@ function EquipmentContent({ characterId, character }: { characterId: number; cha
 
                 <Pressable
                   style={{ flex: 1, minWidth: 0 }}
-                  onPress={() => {
-                    if (!canEdit) return;
-                    setEditing(item);
-                    setFormOpen(true);
-                  }}
+                  onPress={() => setDetailId(item.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Detalhes de ${item.name}`}
                 >
                   <Text variant="body" numberOfLines={1}>
                     {item.name}
@@ -219,6 +238,68 @@ function EquipmentContent({ characterId, character }: { characterId: number; cha
           </Card>
         ))
       )}
+
+      {/* Detalhe do item.
+          Antes, tocar num item abria direto o formulário — e só para quem podia
+          editar, de modo que a descrição ficava inalcançável para todos os
+          outros. O painel resolve as duas coisas: qualquer um lê o item, e é
+          daqui que ele é exibido aos outros. */}
+      <Sheet
+        visible={detail !== null}
+        onClose={() => setDetailId(null)}
+        title={detail?.name ?? ''}
+        subtitle={detail?.category_label}
+      >
+        {detail ? (
+          <>
+            <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
+              {detail.quantity > 1 ? <Chip label={`×${detail.quantity}`} compact /> : null}
+              {detail.equipped ? <Chip label="equipado" compact tone="success" /> : null}
+            </View>
+
+            <View style={{ gap: spacing.xs }}>
+              <DetailRow label="Espaços" value={formatSlots(detail.total_slots)} />
+              <DetailRow label="Preço" value={detail.price !== null ? formatTibar(detail.price) : null} />
+              <DetailRow label="Defesa" value={detail.defense_bonus ? `+${detail.defense_bonus}` : null} />
+              <DetailRow
+                label="Penalidade de armadura"
+                value={detail.armor_penalty ? String(detail.armor_penalty) : null}
+              />
+              <DetailRow label="Peso da armadura" value={detail.armor_weight} />
+            </View>
+
+            <Text variant="body" tone="secondary">
+              {detail.description || 'Sem descrição.'}
+            </Text>
+
+            <ShowcaseButton kind="item" characterId={characterId} resourceId={detail.id} />
+
+            {canEdit ? (
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <Button
+                  label="Editar"
+                  variant="secondary"
+                  style={{ flex: 1 }}
+                  onPress={() => {
+                    setEditing(detail);
+                    setDetailId(null);
+                    setFormOpen(true);
+                  }}
+                />
+                <Button
+                  label="Remover"
+                  variant="danger"
+                  style={{ flex: 1 }}
+                  onPress={() => {
+                    removeItem.mutate(detail.id);
+                    setDetailId(null);
+                  }}
+                />
+              </View>
+            ) : null}
+          </>
+        ) : null}
+      </Sheet>
 
       {/* A key força um formulário novo a cada item aberto: sem isso o estado
           inicial ficaria preso no primeiro item selecionado. */}

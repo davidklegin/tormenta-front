@@ -6,6 +6,7 @@ import { charactersApi } from '@/api';
 import type { Character, CharacterClassAbility } from '@/api/types';
 import { Button, Card, Chip, Input, Sheet, Text } from '@/components/ui';
 import { SheetScreen } from '@/components/character/SheetScreen';
+import { ShowcaseButton } from '@/components/showcase';
 import { radius, spacing, useTheme } from '@/theme';
 
 /**
@@ -123,6 +124,8 @@ function AbilitiesContent({ characterId, character }: { characterId: number; cha
             <Text variant="body" tone="secondary">
               {detail.description || 'Sem descrição.'}
             </Text>
+
+            <ShowcaseButton kind="class_ability" characterId={characterId} resourceId={detail.id} />
 
             {canEdit ? (
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>

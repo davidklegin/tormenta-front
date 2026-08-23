@@ -4,9 +4,22 @@ import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { charactersApi } from '@/api';
 import type { Character, CharacterSpell } from '@/api/types';
-import { Button, Card, Chip, HelpNote, Input, SegmentedControl, Select, Sheet, Text, Toast } from '@/components/ui';
+import {
+  Button,
+  Card,
+  Chip,
+  DetailRow,
+  HelpNote,
+  Input,
+  SegmentedControl,
+  Select,
+  Sheet,
+  Text,
+  Toast,
+} from '@/components/ui';
 import { SheetScreen } from '@/components/character/SheetScreen';
 import { SpellCatalogSheet } from '@/components/character/SpellCatalogSheet';
+import { ShowcaseButton } from '@/components/showcase';
 import { useReference } from '@/hooks/useReference';
 import { SPELL_CIRCLE_COST } from '@/rules';
 import { radius, spacing, useTheme } from '@/theme';
@@ -247,6 +260,8 @@ function SpellsContent({ characterId, character }: { characterId: number; charac
               </View>
             ) : null}
 
+            <ShowcaseButton kind="spell" characterId={characterId} resourceId={detail.id} />
+
             {canEdit ? (
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                 <Button
@@ -294,21 +309,6 @@ function SpellsContent({ characterId, character }: { characterId: number; charac
       />
 
       {aviso ? <Toast message={aviso} tone="success" onDismiss={() => setAviso(null)} /> : null}
-    </View>
-  );
-}
-
-function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
-  if (!value) return null;
-
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.md }}>
-      <Text variant="small" tone="muted">
-        {label}
-      </Text>
-      <Text variant="small" style={{ flex: 1, textAlign: 'right' }}>
-        {value}
-      </Text>
     </View>
   );
 }

@@ -5,6 +5,7 @@ export { Button, type ButtonProps } from './Button';
 export { Card, type CardProps } from './Card';
 export { Chip, type ChipProps } from './Chip';
 export { CornerOrnament, type CornerOrnamentProps } from './CornerOrnament';
+export { DetailRow, type DetailRowProps } from './DetailRow';
 export { DiceRoll, type DiceRollProps } from './DiceRoll';
 export { Divider, type DividerProps } from './Divider';
 export { DropCap, type DropCapProps } from './DropCap';

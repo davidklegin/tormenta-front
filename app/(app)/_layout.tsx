@@ -1,4 +1,6 @@
+import { View } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
+import { ShowcaseOverlay } from '@/components/showcase';
 import { useAuthStore } from '@/store/auth';
 import { useTheme } from '@/theme';
 
@@ -13,11 +15,18 @@ export default function AppLayout() {
   }
 
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        contentStyle: { backgroundColor: colors.bg },
-      }}
-    />
+    // O overlay é irmão da pilha, e não filho de uma tela: o "Exibir aos
+    // outros" alcança quem está na ficha, no painel do mestre ou no perfil, e
+    // o painel que ele abre não pode depender de qual rota está montada.
+    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.bg },
+        }}
+      />
+
+      <ShowcaseOverlay />
+    </View>
   );
 }
