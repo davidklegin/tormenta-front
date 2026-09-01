@@ -15,7 +15,6 @@ import {
   Input,
   Loading,
   Screen,
-  SegmentedControl,
   Sheet,
   Text,
 } from '@/components/ui';
@@ -27,7 +26,6 @@ import {
   useCampaignMembers,
   useCampaignNotes,
   useJoinPublicCampaign,
-  useUpdateCampaign,
 } from '@/hooks/useCampaigns';
 import { useNextSession } from '@/hooks/useCampaignSessions';
 import { useStage } from '@/hooks/useStage';
@@ -83,15 +81,7 @@ export default function CampaignScreen() {
     },
   });
 
-  const regenerate = useMutation({
-    mutationFn: () => campaignsApi.regenerateInviteCode(campaignId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['campaign', campaignId] });
-    },
-  });
-
   const joinPublic = useJoinPublicCampaign();
-  const updateCampaign = useUpdateCampaign(campaignId);
 
   // Permissão MASTER da plataforma — diferente de `campaign.is_master`, que é
   // o papel de mestre desta mesa.
@@ -164,74 +154,48 @@ export default function CampaignScreen() {
         </Card>
       ) : null}
 
+      {/* Quando a mesa joga abre a tela: é a pergunta que se faz ao abrir a
+          campanha, e vale inclusive para o visitante do catálogo — é o dado
+          que decide se entra. */}
+      <ProximaSessao campaignId={campaignId} podeMarcar={isMaster} />
+
       {/* O palco só aparece para quem senta à mesa: é o que o servidor
           responde, e um card convidando o visitante a abrir uma tela que ele
           não pode ver seria só uma porta trancada. */}
       {data.is_member ? <PalcoDaSessao campaignId={campaignId} isPlatformMaster={isPlatformMaster} /> : null}
 
-      {/* Quando a mesa joga. Aparece para todo mundo que alcança a campanha,
-          inclusive o visitante do catálogo: é o dado que decide se vale
-          entrar. */}
-      <ProximaSessao campaignId={campaignId} podeMarcar={isMaster} />
-
       {/* Anotações em destaque: é o que a mesa mais consulta entre as sessões,
           então mostra o conteúdo, e não só um botão para outro lugar. */}
       <NotasDaCampanha campaignId={campaignId} notas={notes.data?.data ?? []} carregando={notes.isLoading} />
 
-      {/* Visibilidade: quem decide se a mesa fica no catálogo é o mestre */}
-      {isMaster ? (
-        <Card title="Visibilidade" subtitle="Quem encontra esta campanha">
-          <View style={{ gap: spacing.md }}>
-            <SegmentedControl
-              value={data.visibility}
-              onChange={(visibility) => updateCampaign.mutate({ visibility })}
-              segments={[
-                { value: 'public', label: 'Pública' },
-                { value: 'private', label: 'Privada' },
-              ]}
-            />
-            <Text variant="caption" tone="muted">
-              {data.visibility === 'public'
-                ? 'A mesa aparece no catálogo, e qualquer jogador entra com um toque. O Painel do Mestre e as anotações marcadas "somente o mestre" continuam só seus.'
-                : 'A mesa sai do catálogo: chega só a quem você mandar o link ou o código. Quem chegar entra do mesmo jeito — as mesas são abertas. O Painel do Mestre e as anotações marcadas "somente o mestre" continuam só seus.'}
-            </Text>
-          </View>
-        </Card>
-      ) : null}
+      {/* Personagens da mesa — logo abaixo das anotações: são as duas
+          coisas que a mesa abre entre uma sessão e outra. */}
+      <View style={{ gap: spacing.sm }}>
+        <Text variant="caption" tone="secondary" uppercase>
+          Personagens na campanha
+        </Text>
 
-      {/* Código de convite: só o mestre vê */}
-      {isMaster && data.invite_code ? (
-        <Card title="Convite" subtitle="Compartilhe este código com seus jogadores">
-          <View style={{ gap: spacing.md }}>
-            <View
-              style={{
-                backgroundColor: colors.surfaceAlt,
-                borderRadius: radius.md,
-                borderWidth: 1,
-                borderColor: colors.accentInk,
-                paddingVertical: spacing.md,
-                alignItems: 'center',
-              }}
-            >
-              <Text variant="numeric" tone="gold" style={{ letterSpacing: 4 }}>
-                {data.invite_code}
-              </Text>
-            </View>
-            <Button
-              label="Gerar novo código"
-              variant="ghost"
-              size="sm"
-              onPress={() => regenerate.mutate()}
-              loading={regenerate.isPending}
-            />
-            <Text variant="caption" tone="muted">
-              Gerar um novo código invalida os convites já distribuídos.
-            </Text>
-          </View>
-        </Card>
-      ) : null}
+        {(characters.data ?? []).length === 0 ? (
+          <EmptyState
+            icon="personagens"
+            title="Nenhum personagem vinculado"
+            description="Os jogadores vinculam seus personagens a esta campanha pela ficha."
+          />
+        ) : (
+          <ResponsiveGrid columns={{ phone: 1, tablet: 2, desktop: 3 }}>
+            {(characters.data ?? []).map((character) => (
+              <CharacterCard
+                key={character.id}
+                character={character}
+                onPress={() => router.push(`/(app)/personagens/${character.id}`)}
+              />
+            ))}
+          </ResponsiveGrid>
+        )}
+      </View>
 
-      {/* Membros */}
+      {/* Membros por último: é administração da mesa, consultada de vez
+          em quando, e não o que se vem ver aqui. */}
       <Card
         title="Membros"
         right={
@@ -275,31 +239,6 @@ export default function CampaignScreen() {
           ) : null}
         </View>
       </Card>
-
-      {/* Personagens da mesa */}
-      <View style={{ gap: spacing.sm }}>
-        <Text variant="caption" tone="secondary" uppercase>
-          Personagens na campanha
-        </Text>
-
-        {(characters.data ?? []).length === 0 ? (
-          <EmptyState
-            icon="personagens"
-            title="Nenhum personagem vinculado"
-            description="Os jogadores vinculam seus personagens a esta campanha pela ficha."
-          />
-        ) : (
-          <ResponsiveGrid columns={{ phone: 1, tablet: 2, desktop: 3 }}>
-            {(characters.data ?? []).map((character) => (
-              <CharacterCard
-                key={character.id}
-                character={character}
-                onPress={() => router.push(`/(app)/personagens/${character.id}`)}
-              />
-            ))}
-          </ResponsiveGrid>
-        )}
-      </View>
 
       <Sheet
         visible={inviteOpen}

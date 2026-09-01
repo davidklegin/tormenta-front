@@ -15,17 +15,17 @@ import {
 import { CharacterCard } from '@/components/character/CharacterCard';
 import { PageHeader, ResponsiveGrid } from '@/components/layout';
 import { useAllCharacters, useCharacters } from '@/hooks/useCharacters';
-import { useCampaigns } from '@/hooks/useCampaigns';
 import { useAuthStore } from '@/store/auth';
-import { radius, spacing, useTheme } from '@/theme';
+import { spacing, useTheme } from '@/theme';
 
 type Aba = 'minhas' | 'todas';
 
 /**
  * Tela inicial do jogador (briefing §8).
  *
- * "Minhas" lista as fichas do usuário e, quando ele mestra alguma campanha,
- * oferece o atalho para o Painel do Mestre — a porta de entrada da sessão.
+ * "Minhas" lista as fichas do usuário. As mesas que ele mestra ficam na aba
+ * Campanhas, e não aqui: esta tela é sobre personagens, e o atalho de mestre
+ * empurrava as fichas para baixo da dobra em quem mestra mais de uma mesa.
  *
  * "Todas" é a base inteira: a leitura de fichas é aberta (CharacterPolicy::view),
  * então qualquer um abre qualquer ficha, em modo leitura. Editar continua sendo
@@ -41,10 +41,8 @@ export default function CharactersScreen() {
 
   const characters = useCharacters();
   const todos = useAllCharacters(aba === 'todas' ? busca.trim() : '');
-  const campaigns = useCampaigns();
 
   const lista = aba === 'minhas' ? characters : todos;
-  const masteredCampaigns = (campaigns.data ?? []).filter((campaign) => campaign.is_master);
 
   return (
     <Screen
@@ -52,65 +50,18 @@ export default function CharactersScreen() {
       refreshControl={
         <RefreshControl
           refreshing={lista.isRefetching}
-          onRefresh={() => {
-            void lista.refetch();
-            void campaigns.refetch();
-          }}
+          onRefresh={() => void lista.refetch()}
           tintColor={colors.primary}
         />
       }
     >
       <PageHeader
         title={`Olá, ${user?.nickname || user?.name?.split(' ')[0] || 'aventureiro'}`}
-        subtitle={aba === 'minhas' ? 'Seus personagens e mesas' : 'Fichas de toda a comunidade'}
+        subtitle={aba === 'minhas' ? 'Seus personagens' : 'Fichas de toda a comunidade'}
         actions={
           <Button label="Novo personagem" size="sm" onPress={() => router.push('/(app)/personagens/novo')} />
         }
       />
-
-      {/* Atalho de mestre (briefing §8) — pertence à minha mesa, não ao catálogo. */}
-      {aba === 'minhas' && masteredCampaigns.length > 0 ? (
-        <View style={{ gap: spacing.sm }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-            <Icon name="mestre" size={18} color={colors.accentInk} />
-            <Text variant="caption" tone="secondary" uppercase>
-              Campanhas que você mestra
-            </Text>
-          </View>
-          <ResponsiveGrid columns={{ phone: 1, tablet: 2, desktop: 3 }}>
-            {masteredCampaigns.map((campaign) => (
-              <View
-                key={campaign.id}
-                style={{
-                  backgroundColor: colors.surface,
-                  borderRadius: radius.lg,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  borderLeftWidth: 3,
-                  borderLeftColor: colors.accentInk,
-                  padding: spacing.lg,
-                  gap: spacing.md,
-                }}
-              >
-                <View style={{ gap: 2 }}>
-                  <Text variant="subheading" numberOfLines={1}>
-                    {campaign.name}
-                  </Text>
-                  <Text variant="small" tone="muted">
-                    {campaign.characters_count ?? 0} personagem(ns) · {campaign.members_count ?? 0} membro(s)
-                  </Text>
-                </View>
-                <Button
-                  label="Abrir Painel do Mestre"
-                  variant="gold"
-                  size="sm"
-                  onPress={() => router.push(`/(app)/campanhas/${campaign.id}/painel`)}
-                />
-              </View>
-            ))}
-          </ResponsiveGrid>
-        </View>
-      ) : null}
 
       <View style={{ gap: spacing.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
