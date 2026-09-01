@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, charactersApi } from '@/api';
-import type { Character, CharacterItem } from '@/api/types';
+import type { Character, CharacterItem, ReferenceItem } from '@/api/types';
 import {
   Button,
   Card,
@@ -20,7 +20,7 @@ import {
 import { SheetScreen } from '@/components/character/SheetScreen';
 import { ShowcaseButton } from '@/components/showcase';
 import { useReference } from '@/hooks/useReference';
-import { formatSlots, formatTibar } from '@/rules';
+import { describeCatalogItem, formatSlots, formatTibar } from '@/rules';
 import { radius, spacing, useTheme } from '@/theme';
 
 /**
@@ -368,7 +368,7 @@ function ItemForm({
   onClose: () => void;
   characterId: number;
   item: CharacterItem | null;
-  catalog: { id: number; name: string; category: string; slots: number }[];
+  catalog: ReferenceItem[];
   onSaved: () => void;
 }) {
   const [name, setName] = useState(item?.name ?? '');
@@ -425,7 +425,7 @@ function ItemForm({
         options={catalog.map((entry) => ({
           value: entry.id,
           label: entry.name,
-          description: `${entry.category} · ${formatSlots(entry.slots)} espaço(s)`,
+          description: describeCatalogItem(entry),
         }))}
         onChange={(value) => {
           setCatalogId(value);
@@ -433,6 +433,10 @@ function ItemForm({
           if (found) {
             setName(found.name);
             setSlots(String(found.slots));
+            // A regra do item (o que o fogo alquímico faz) só chega à ficha se
+            // vier junto. O que o jogador já escreveu à mão manda: um item
+            // adaptado na mesa não é sobrescrito pela troca de catálogo.
+            if (!description.trim() && found.description) setDescription(found.description);
           }
         }}
         clearable

@@ -14,7 +14,7 @@ import {
 import { useLinkableCampaigns } from '@/hooks/useCampaigns';
 import { useCreateCharacter } from '@/hooks/useCharacters';
 import { useReference } from '@/hooks/useReference';
-import { ATTRIBUTE_LABELS, ATTRIBUTE_ORDER, signed } from '@/rules';
+import { ATTRIBUTE_LABELS, ATTRIBUTE_ORDER, describeOrigin, signed } from '@/rules';
 import { radius, spacing, useTheme } from '@/theme';
 
 /**
@@ -190,7 +190,7 @@ export default function NewCharacterScreen() {
             options={(reference.data?.origins ?? []).map((entry) => ({
               value: entry.id,
               label: entry.name,
-              description: entry.skills?.join(', '),
+              description: describeOrigin(entry),
             }))}
             onChange={setOriginId}
             clearable

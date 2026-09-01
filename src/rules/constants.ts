@@ -54,3 +54,19 @@ export const REST_QUALITIES = [
 
 /** Ajustes rápidos de PV/PM no controle de sessão (briefing §19). */
 export const QUICK_STEPS = [1, 5, 10] as const;
+
+/**
+ * Os grupos dos itens alquímicos e esotéricos da wiki.
+ *
+ * Ficam ao lado da categoria na tela de equipamento porque é o subtipo que
+ * distingue um veneno de uma poção de cura — ambos são consumíveis, e a
+ * categoria sozinha diria a mesma coisa dos dois.
+ */
+export const ITEM_SUBTYPE_LABELS: Record<string, string> = {
+  preparado: 'Preparado',
+  catalisador: 'Catalisador',
+  veneno: 'Veneno',
+  alquimia_mistica: 'Alquimia mística',
+  esoterico: 'Esotérico',
+  esoterico_especifico: 'Esotérico específico',
+};

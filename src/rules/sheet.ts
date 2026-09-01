@@ -1,4 +1,5 @@
-import type { AttributeKey, Character, CharacterItem } from '@/api/types';
+import type { AttributeKey, Character, CharacterItem, ReferenceOrigin } from '@/api/types';
+import { ITEM_SUBTYPE_LABELS } from './constants';
 import { halfLevel, trainingBonus } from './progression';
 
 /**
@@ -145,4 +146,37 @@ export function formatTibar(value: number): string {
 /** Espaços de carga: mostra "0,5" em vez de "0.5". */
 export function formatSlots(value: number): string {
   return value.toLocaleString('pt-BR', { maximumFractionDigits: 1 });
+}
+
+/**
+ * A linha embaixo do nome da origem no seletor.
+ *
+ * As origens do livro base oferecem uma lista de perícias e poderes da qual o
+ * jogador escolhe dois, e a lista já resume a origem. As regionais (Atlas de
+ * Arton) não têm lista: o benefício é fixo e só o texto o descreve — sem ele a
+ * tela mostraria um nome solto.
+ */
+export function describeOrigin(origin: ReferenceOrigin): string | undefined {
+  if (origin.skills?.length) return origin.skills.join(', ');
+
+  return origin.description ?? undefined;
+}
+
+/**
+ * A linha embaixo do nome do item no catálogo do livro.
+ *
+ * Alquímicos e esotéricos chegam aos montes e com homônimos entre publicações
+ * — dois "tomo do rancor", dois "ostensório santificado" —, então o grupo e o
+ * livro entram junto com o tamanho: sem eles, duas linhas iguais na lista
+ * deixam a escolha no chute.
+ */
+export function describeCatalogItem(item: {
+  category: string;
+  subtype?: string | null;
+  source?: string | null;
+  slots: number;
+}): string {
+  const grupo = item.subtype ? (ITEM_SUBTYPE_LABELS[item.subtype] ?? item.subtype) : item.category;
+
+  return [grupo, item.source, `${formatSlots(item.slots)} espaço(s)`].filter(Boolean).join(' · ');
 }

@@ -27,7 +27,7 @@ import {
 import { useLinkableCampaigns } from '@/hooks/useCampaigns';
 import { useCharacter, useDeleteCharacter, useUpdateCharacter } from '@/hooks/useCharacters';
 import { useReference } from '@/hooks/useReference';
-import { ATTRIBUTE_LABELS, ATTRIBUTE_ORDER, previewDefense, signed } from '@/rules';
+import { ATTRIBUTE_LABELS, ATTRIBUTE_ORDER, describeOrigin, previewDefense, signed } from '@/rules';
 import { ArquivoGrandeDemaisError } from '@/utils/arquivo';
 import { prepararImagemParaUpload } from '@/utils/imagem';
 import { spacing } from '@/theme';
@@ -342,7 +342,11 @@ function EditForm({ character }: { character: Character }) {
           <Select
             label="Origem"
             value={originId}
-            options={(reference.data?.origins ?? []).map((entry) => ({ value: entry.id, label: entry.name }))}
+            options={(reference.data?.origins ?? []).map((entry) => ({
+              value: entry.id,
+              label: entry.name,
+              description: describeOrigin(entry),
+            }))}
             onChange={setOriginId}
             clearable
           />

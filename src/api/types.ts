@@ -696,6 +696,9 @@ export type ReferenceOrigin = {
   skills: string[] | null;
   powers: string[] | null;
   unique_power_name: string | null;
+  /** Origens regionais têm um benefício fixo em vez da lista de escolher dois. */
+  description: string | null;
+  items: string | null;
 };
 
 export type ReferenceDeity = {
@@ -712,6 +715,11 @@ export type ReferenceItem = {
   key: string;
   name: string;
   category: CharacterItem['category'];
+  /** Grupo dos alquímicos e esotéricos: preparado, catalisador, veneno… */
+  subtype: string | null;
+  /** A publicação — desempata itens homônimos de livros diferentes. */
+  source: string | null;
+  description: string | null;
   price: number | null;
   slots: number;
   proficiency: string | null;
