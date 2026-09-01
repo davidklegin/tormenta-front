@@ -8,6 +8,7 @@ import type { AttributeKey, Character } from '@/api/types';
 import {
   Button,
   Card,
+  Checkbox,
   Chip,
   ErrorState,
   HelpNote,
@@ -84,6 +85,8 @@ function EditForm({ character }: { character: Character }) {
   const [proficiencies, setProficiencies] = useState(character.proficiencies ?? '');
   const [defenseOther, setDefenseOther] = useState(String(character.defense.other_bonus));
   const [defenseAttribute, setDefenseAttribute] = useState<AttributeKey>(character.defense.attribute);
+  const [damageReduction, setDamageReduction] = useState(String(character.damage_reduction.declared));
+  const [ignoresArmorPenalty, setIgnoresArmorPenalty] = useState(character.ignores_armor_penalty);
   const [attributes, setAttributes] = useState<Record<AttributeKey, string>>(
     () =>
       Object.fromEntries(
@@ -253,6 +256,8 @@ function EditForm({ character }: { character: Character }) {
         proficiencies: proficiencies.trim() || null,
         defense_attribute: defenseAttribute,
         defense_other_bonus: Number.parseInt(defenseOther, 10) || 0,
+        damage_reduction: Math.max(0, Number.parseInt(damageReduction, 10) || 0),
+        ignores_armor_penalty: ignoresArmorPenalty,
         attributes: Object.fromEntries(
           ATTRIBUTE_ORDER.map((key) => [key, Number.parseInt(attributes[key] ?? '0', 10) || 0])
         ),
@@ -477,6 +482,21 @@ function EditForm({ character }: { character: Character }) {
           <Text variant="small" tone="secondary">
             {describeDefense(defenseAttribute, defensePreview, Number.parseInt(defenseOther, 10) || 0)}
           </Text>
+
+          <Input
+            label="Redução de dano (RD)"
+            value={damageReduction}
+            onChangeText={setDamageReduction}
+            keyboardType="number-pad"
+            hint="Sai de cada golpe antes dos PV. Armadura de adamante, linhagem dracônica, forma monstruosa."
+          />
+
+          <Checkbox
+            label="Ignora a penalidade de armadura"
+            checked={ignoresArmorPenalty}
+            onChange={setIgnoresArmorPenalty}
+            hint="Para quem tem habilidade que anula a penalidade da armadura e do escudo em Acrobacia, Furtividade e Ladinagem. O −5 por excesso de carga continua valendo."
+          />
         </View>
       </Card>
 

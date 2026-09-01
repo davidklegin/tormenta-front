@@ -3,7 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { charactersApi } from '@/api';
 import type { Character } from '@/api/types';
-import { Button, Card, HelpNote, Icon, Text } from '@/components/ui';
+import { Button, Card, Divider, HelpNote, Icon, Text } from '@/components/ui';
 import { AttackManager } from '@/components/character/AttackManager';
 import { ConditionManager } from '@/components/character/ConditionManager';
 import { ResourceManager } from '@/components/character/ResourceManager';
@@ -158,6 +158,41 @@ function CombatContent({ characterId, character }: { characterId: number; charac
                 : `o atributo escolhido na ficha, ${ATTRIBUTE_LABELS[character.defense.attribute].full},`
             } mais o que armadura e escudo derem.`}
           </HelpNote>
+
+          {/* RD fica no mesmo card: Defesa é acertar, RD é o quanto dói. */}
+          {character.damage_reduction.total > 0 ? (
+            <>
+              <Divider />
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <Text variant="bodyStrong" style={{ flex: 1 }}>
+                  Redução de dano
+                </Text>
+                <Text variant="numeric" tone="primary">
+                  {character.damage_reduction.total}
+                </Text>
+              </View>
+
+              {character.damage_reduction.breakdown.length > 1 ? (
+                <View style={{ gap: spacing.xs }}>
+                  {character.damage_reduction.breakdown.map((parte, index) => (
+                    <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <Text variant="small" tone="secondary">
+                        {parte.label}
+                      </Text>
+                      <Text variant="smallStrong">{signed(parte.value)}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+
+              <HelpNote collapsible source="Livro base, p. 106">
+                {`A redução de dano sai de cada golpe que te acerta, antes de os PV caírem: com RD ${
+                  character.damage_reduction.total
+                }, um golpe de 8 tira ${Math.max(0, 8 - character.damage_reduction.total)}.`}
+              </HelpNote>
+            </>
+          ) : null}
         </View>
       </Card>
 

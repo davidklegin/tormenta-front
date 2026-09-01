@@ -4,6 +4,7 @@ import {
   AttributeBlock,
   Button,
   Card,
+  Checkbox,
   Chip,
   DiceRoll,
   Divider,
@@ -61,6 +62,7 @@ export default function StyleguideScreen() {
   const [comErro, setComErro] = useState('');
   const [aba, setAba] = useState<'todas' | 'arcanas' | 'divinas'>('todas');
   const [selecao, setSelecao] = useState<string | null>('humano');
+  const [marcado, setMarcado] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
   const [avisoVisivel, setAvisoVisivel] = useState(true);
   const [cardAtivo, setCardAtivo] = useState(true);
@@ -283,6 +285,12 @@ export default function StyleguideScreen() {
                   { value: 'anao', label: 'Anão', description: '+2 Con, +1 Sab, −1 Des' },
                   { value: 'elfo', label: 'Elfo', description: '+2 Int, +1 Des, −1 Con' },
                 ]}
+              />
+              <Checkbox
+                label="Ignora a penalidade de armadura"
+                checked={marcado}
+                onChange={setMarcado}
+                hint="Opção de sim ou não: desmarcada, a caixa vazia diz que a regra está desligada."
               />
             </View>
           </Secao>

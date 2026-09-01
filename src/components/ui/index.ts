@@ -3,6 +3,7 @@ export { AttributeBlock, type AttributeBlockProps } from './AttributeBlock';
 export { BackButton, type BackButtonProps } from './BackButton';
 export { Button, type ButtonProps } from './Button';
 export { Card, type CardProps } from './Card';
+export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Chip, type ChipProps } from './Chip';
 export { CornerOrnament, type CornerOrnamentProps } from './CornerOrnament';
 export { DetailRow, type DetailRowProps } from './DetailRow';

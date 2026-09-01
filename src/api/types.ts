@@ -256,7 +256,14 @@ export type CharacterPowerEffect = {
   applied: boolean;
 };
 
-export type PowerEffectTarget = 'skill' | 'defense' | 'hp' | 'mp' | 'displacement' | 'attribute';
+export type PowerEffectTarget =
+  | 'skill'
+  | 'defense'
+  | 'hp'
+  | 'mp'
+  | 'displacement'
+  | 'damage_reduction'
+  | 'attribute';
 
 /** O mesmo bônus visto do catálogo, antes de entrar em qualquer ficha. */
 export type CatalogPowerEffect = {
@@ -507,7 +514,15 @@ export type Character = {
     suggested: AttributeKey[];
   };
   defense: Calculation & { attribute: AttributeKey; other_bonus: number };
+  /** RD: `declared` é o que a ficha guarda, `total` inclui os poderes. */
+  damage_reduction: {
+    total: number;
+    declared: number;
+    breakdown: { label: string; value: number }[];
+  };
   armor_penalty: number;
+  /** Marcado, armadura e escudo param de penalizar (a sobrecarga continua). */
+  ignores_armor_penalty: boolean;
   carry: {
     limit: number;
     used: number;

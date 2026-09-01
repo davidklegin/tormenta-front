@@ -98,6 +98,9 @@ export function CharacterHeader({ character }: { character: Character }) {
         {character.spellcasting.total !== null ? (
           <StatTile label="CD de magia" value={character.spellcasting.total} />
         ) : null}
+        {character.damage_reduction.total > 0 ? (
+          <StatTile label="RD" value={character.damage_reduction.total} />
+        ) : null}
         {character.armor_penalty !== 0 ? (
           <StatTile label="Penal. armadura" value={character.armor_penalty} tone="warning" />
         ) : null}
