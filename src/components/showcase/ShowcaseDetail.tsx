@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import type { ShowcaseEvent } from '@/api/types';
 import { Chip, DetailRow, Text } from '@/components/ui';
-import { formatSlots, formatTibar } from '@/rules';
+import { formatSlots, formatTibar, powerEffectCounts } from '@/rules';
 import { radius, spacing, useTheme } from '@/theme';
 
 /**
@@ -76,7 +76,7 @@ function CorpoPoder({ poder }: { poder: Extract<ShowcaseEvent, { kind: 'power' }
                 key={efeito.index}
                 label={efeito.text ?? ''}
                 compact
-                tone={efeito.active && efeito.applied ? 'success' : 'neutral'}
+                tone={powerEffectCounts(efeito) ? 'success' : 'neutral'}
               />
             ))}
           </View>

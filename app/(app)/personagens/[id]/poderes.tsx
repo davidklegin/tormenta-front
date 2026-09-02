@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -8,6 +8,7 @@ import { Button, Card, Chip, Input, SegmentedControl, Select, Sheet, Text, Toast
 import { PowerCatalogSheet } from '@/components/character/PowerCatalogSheet';
 import { ShowcaseButton } from '@/components/showcase';
 import { SheetScreen } from '@/components/character/SheetScreen';
+import { powerEffectCounts } from '@/rules';
 import { radius, spacing, useTheme } from '@/theme';
 
 /**
@@ -69,6 +70,12 @@ function PowersContent({ characterId, character }: { characterId: number; charac
   const toggleEffect = useMutation({
     mutationFn: ({ powerId, index, active }: { powerId: number; index: number; active: boolean }) =>
       charactersApi.togglePowerEffect(characterId, powerId, index, active),
+    onSuccess: invalidate,
+  });
+
+  const setEffectValue = useMutation({
+    mutationFn: ({ powerId, index, value }: { powerId: number; index: number; value: number | null }) =>
+      charactersApi.setPowerEffectValue(characterId, powerId, index, value),
     onSuccess: invalidate,
   });
 
@@ -154,13 +161,11 @@ function PowersContent({ characterId, character }: { characterId: number; charac
 
               {/* O que este poder está somando agora — o jogador vê na lista
                   que a Defesa dele já conta com a Esquiva. */}
-              {power.effects.some((efeito) => efeito.active && efeito.applied) ? (
+              {power.effects.some(powerEffectCounts) ? (
                 <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
-                  {power.effects
-                    .filter((efeito) => efeito.active && efeito.applied)
-                    .map((efeito) => (
-                      <Chip key={efeito.index} label={efeito.text ?? ''} compact tone="success" />
-                    ))}
+                  {power.effects.filter(powerEffectCounts).map((efeito) => (
+                    <Chip key={efeito.index} label={efeito.text ?? ''} compact tone="success" />
+                  ))}
                 </View>
               ) : null}
 
@@ -207,6 +212,10 @@ function PowersContent({ characterId, character }: { characterId: number; charac
                     onToggle={() =>
                       toggleEffect.mutate({ powerId: detail.id, index: efeito.index, active: !efeito.active })
                     }
+                    onSetValue={(value) =>
+                      setEffectValue.mutate({ powerId: detail.id, index: efeito.index, value })
+                    }
+                    saving={setEffectValue.isPending}
                   />
                 ))}
               </View>
@@ -274,17 +283,28 @@ function PowersContent({ characterId, character }: { characterId: number; charac
  * Bônus permanente aparece aceso e sem botão — ele já está na conta e não há
  * o que decidir. Condicional é um chip que o jogador liga quando entra na
  * situação, com a frase do livro logo abaixo, para ele conferir se é o caso.
+ *
+ * E há o bônus que o livro não tem como calcular sozinho: "você soma seu
+ * Carisma em seus pontos de vida iniciais" dá um número diferente em cada
+ * ficha, e dobra quando o feiticeiro chega à herança superior. Esse vem com um
+ * campo — o jogador responde uma vez, e daí em diante a ficha soma e mostra a
+ * parcela com o nome do poder no detalhamento dos PV.
  */
 function PowerEffectRow({
   effect,
   canEdit,
   onToggle,
+  onSetValue,
+  saving,
 }: {
   effect: CharacterPowerEffect;
   canEdit: boolean;
   onToggle: () => void;
+  onSetValue: (value: number | null) => void;
+  saving: boolean;
 }) {
   const ligavel = canEdit && effect.conditional && effect.applied;
+  const perguntavel = effect.parametric && effect.applied;
 
   return (
     <View style={{ gap: spacing.xxs }}>
@@ -293,7 +313,7 @@ function PowerEffectRow({
           label={effect.text ?? ''}
           compact
           tone={effect.applied ? 'success' : 'neutral'}
-          selected={effect.active && effect.applied}
+          selected={powerEffectCounts(effect)}
           onPress={ligavel ? onToggle : undefined}
         />
         {effect.conditional && !effect.active ? (
@@ -306,6 +326,11 @@ function PowerEffectRow({
             some à mão
           </Text>
         ) : null}
+        {perguntavel && effect.value === null ? (
+          <Text variant="caption" tone="muted">
+            {canEdit ? 'falta dizer quanto' : 'sem valor'}
+          </Text>
+        ) : null}
       </View>
 
       {effect.condition ? (
@@ -313,7 +338,71 @@ function PowerEffectRow({
           {effect.condition}
         </Text>
       ) : null}
+
+      {perguntavel && canEdit ? (
+        <ValorDoEfeito effect={effect} onSave={onSetValue} saving={saving} />
+      ) : null}
+
+      {perguntavel && !canEdit && effect.hint ? (
+        <Text variant="caption" tone="secondary">
+          {effect.hint}
+        </Text>
+      ) : null}
     </View>
+  );
+}
+
+/**
+ * O campo de "quanto este poder soma na minha ficha".
+ *
+ * Salva ao sair do campo, e não a cada tecla: quem digita "12" passaria por
+ * "1", e a ficha piscaria um PV que ninguém pediu. Campo vazio devolve o
+ * efeito ao estado de não respondido — é assim que o jogador tira o bônus da
+ * conta sem remover o poder da ficha.
+ */
+function ValorDoEfeito({
+  effect,
+  onSave,
+  saving,
+}: {
+  effect: CharacterPowerEffect;
+  onSave: (value: number | null) => void;
+  saving: boolean;
+}) {
+  const emTexto = (valor: number | null) => (valor === null ? '' : String(valor));
+  const [rascunho, setRascunho] = useState(emTexto(effect.value));
+
+  // O servidor manda: se o valor mudou por outro caminho, o campo acompanha.
+  useEffect(() => {
+    setRascunho(emTexto(effect.value));
+  }, [effect.value]);
+
+  const salvar = () => {
+    const limpo = rascunho.trim();
+    const valor = limpo === '' ? null : Number.parseInt(limpo, 10);
+
+    if (valor !== null && Number.isNaN(valor)) {
+      setRascunho(emTexto(effect.value));
+
+      return;
+    }
+
+    if (valor !== effect.value) onSave(valor);
+  };
+
+  return (
+    <Input
+      label="Quanto soma"
+      value={rascunho}
+      onChangeText={setRascunho}
+      onBlur={salvar}
+      onSubmitEditing={salvar}
+      returnKeyType="done"
+      keyboardType="numbers-and-punctuation"
+      editable={!saving}
+      hint={effect.hint ?? 'Deixe vazio para tirar da conta sem remover o poder.'}
+      containerStyle={{ maxWidth: 260 }}
+    />
   );
 }
 

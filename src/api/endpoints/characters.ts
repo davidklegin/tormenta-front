@@ -191,6 +191,16 @@ export const charactersApi = {
       body: { index, active },
     }).then((r) => r.data),
   /**
+   * Responde o bônus cujo número o livro não tem como saber — quantos PV a
+   * linhagem dracônica soma é o Carisma daquele feiticeiro. `null` apaga a
+   * resposta sem tirar o poder da ficha.
+   */
+  setPowerEffectValue: (id: number, powerId: number, index: number, value: number | null) =>
+    apiRequest<{ data: CharacterPower }>(`/characters/${id}/powers/${powerId}/effect`, {
+      method: 'PATCH',
+      body: { index, value },
+    }).then((r) => r.data),
+  /**
    * Adiciona de uma vez os poderes marcados na biblioteca. O backend ignora os
    * que o personagem já tem e devolve quantos entraram e quantos pulou.
    */

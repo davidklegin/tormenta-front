@@ -1,4 +1,10 @@
-import type { AttributeKey, Character, CharacterItem, ReferenceOrigin } from '@/api/types';
+import type {
+  AttributeKey,
+  Character,
+  CharacterItem,
+  CharacterPowerEffect,
+  ReferenceOrigin,
+} from '@/api/types';
 import { ITEM_SUBTYPE_LABELS } from './constants';
 import { halfLevel, trainingBonus } from './progression';
 
@@ -128,6 +134,18 @@ export function severityFor(current: number, max: number): 'ok' | 'warning' | 'c
 /** Busca um atributo da ficha pelo código. */
 export function attributeValue(character: Character, key: AttributeKey): number {
   return character.attributes.find((attribute) => attribute.key === key)?.total ?? 0;
+}
+
+/**
+ * O bônus do poder está mesmo entrando na conta agora?
+ *
+ * Três coisas precisam valer juntas: a ficha somar aquele alvo (`applied`), o
+ * jogador ter o efeito ligado, e haver um número — o efeito parametrizável,
+ * como os PV da linhagem dracônica, fica sem valor até alguém responder
+ * quanto é, e até lá não muda nada na ficha.
+ */
+export function powerEffectCounts(effect: CharacterPowerEffect): boolean {
+  return effect.applied && effect.active && effect.value !== null && effect.value !== 0;
 }
 
 /** Formata modificadores com sinal, como a ficha faz: +4, −1, +0. */

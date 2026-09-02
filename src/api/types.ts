@@ -242,15 +242,24 @@ export type CharacterPower = {
  * depende de situação nasce desligado, com a condição escrita: o +5 na Defesa
  * do Combate Defensivo custa −2 em todos os ataques e dura um turno, então
  * quem decide quando ele vale é o jogador.
+ *
+ * E há o bônus que só o personagem responde (`parametric`): quantos PV a
+ * linhagem dracônica soma é o Carisma daquele feiticeiro. Esse chega com
+ * `value` nulo até o jogador preencher.
  */
 export type CharacterPowerEffect = {
   /** Posição no poder — é por ela que o efeito é ligado e desligado. */
   index: number;
   target: PowerEffectTarget;
-  value: number;
+  /** null enquanto o efeito parametrizável não foi respondido. */
+  value: number | null;
   text: string | null;
   conditional: boolean;
   condition: string | null;
+  /** O número é do personagem, não do livro — a ficha pergunta quanto é. */
+  parametric: boolean;
+  /** Onde o livro diz para buscar o número, quando `parametric`. */
+  hint: string | null;
   active: boolean;
   /** false quando a ficha ainda não soma esse alvo; o jogador soma à mão. */
   applied: boolean;
@@ -269,10 +278,13 @@ export type PowerEffectTarget =
 export type CatalogPowerEffect = {
   target: PowerEffectTarget;
   keys?: string[];
-  value: number;
+  /** null no efeito parametrizável: o número sai da ficha, não do livro. */
+  value: number | null;
   text: string;
   conditional?: boolean;
   condition?: string;
+  parametric?: boolean;
+  hint?: string;
 };
 
 /** Poder na biblioteca — o resumo que a lista de escolha exibe. */

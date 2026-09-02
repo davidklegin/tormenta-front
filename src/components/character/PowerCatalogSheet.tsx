@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { charactersApi, powersApi } from '@/api';
-import type { CatalogPower, CatalogPowerDetail, Character } from '@/api/types';
+import type { CatalogPower, CatalogPowerDetail, CatalogPowerEffect, Character } from '@/api/types';
 import { Button, Chip, Icon, Input, Loading, SegmentedControl, Sheet, Text } from '@/components/ui';
 import { usePowerCatalog, usePowerCatalogFilters } from '@/hooks/usePowerCatalog';
 import { radius, spacing, tones, useTheme } from '@/theme';
@@ -281,15 +281,16 @@ function LinhaDoPoder({
             ) : null}
 
             {/* O que o poder faria na ficha. Dizer aqui que o condicional
-                entra desligado evita o jogador achar que a conta mudou. */}
+                entra desligado — e que o parametrizável ainda vai perguntar
+                um número — evita o jogador achar que a conta já mudou. */}
             {power.effects.length > 0 ? (
               <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap', marginTop: 2 }}>
                 {power.effects.map((efeito, i) => (
                   <Chip
                     key={`${efeito.target}-${i}`}
-                    label={efeito.conditional ? `${efeito.text} (se…)` : efeito.text}
+                    label={rotuloDoEfeito(efeito)}
                     compact
-                    tone={efeito.conditional ? 'neutral' : 'success'}
+                    tone={efeito.conditional || efeito.parametric ? 'neutral' : 'success'}
                   />
                 ))}
               </View>
@@ -361,4 +362,17 @@ function DescricaoDoPoder({ id }: { id: number }) {
       )}
     </View>
   );
+}
+
+/**
+ * O rótulo do bônus na biblioteca, antes de o poder entrar em qualquer ficha.
+ *
+ * O condicional avisa que depende de situação; o parametrizável avisa que o
+ * número é do personagem — a linhagem dracônica soma PV, mas quantos é o
+ * Carisma de quem a pegou, e a ficha vai perguntar.
+ */
+function rotuloDoEfeito(efeito: CatalogPowerEffect): string {
+  if (efeito.parametric) return `${efeito.text} (você define)`;
+
+  return efeito.conditional ? `${efeito.text} (se…)` : efeito.text;
 }
