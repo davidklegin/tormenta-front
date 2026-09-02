@@ -122,7 +122,7 @@ export default function NewCharacterScreen() {
         race_id: raca.raceId,
         race_variant: raca.variant,
         racial_attribute_choices: raca.choices.length > 0 ? raca.choices : undefined,
-        origin_id: originId,
+        origin_id: race?.skips_origin ? null : originId,
         deity_id: deityId,
         campaign_id: campaignId,
         attributes,
@@ -161,7 +161,18 @@ export default function NewCharacterScreen() {
         <View style={{ gap: spacing.md }}>
           <Input label="Nome" value={name} onChangeText={setName} placeholder="Como será chamado na mesa" />
 
-          <RaceFields races={reference.data?.races ?? []} value={raca} onChange={setRaca} />
+          <RaceFields
+            races={reference.data?.races ?? []}
+            value={raca}
+            onChange={(escolha) => {
+              setRaca(escolha);
+
+              // O golem é construído pronto e não escolhe origem: uma origem
+              // marcada antes da raça ficaria na tela dizendo o contrário.
+              const nova = reference.data?.races.find((entry) => entry.id === escolha.raceId);
+              if (nova?.skips_origin) setOriginId(null);
+            }}
+          />
 
           <View style={{ flexDirection: 'row', gap: spacing.md }}>
             <View style={{ flex: 2 }}>
@@ -194,6 +205,12 @@ export default function NewCharacterScreen() {
             }))}
             onChange={setOriginId}
             clearable
+            disabled={race?.skips_origin ?? false}
+            hint={
+              race?.skips_origin
+                ? `${race.name} recebe um poder geral no lugar da origem.`
+                : undefined
+            }
           />
 
           <Select

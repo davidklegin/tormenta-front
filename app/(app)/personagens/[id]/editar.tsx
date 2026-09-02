@@ -117,6 +117,16 @@ function EditForm({ character }: { character: Character }) {
   );
 
   /**
+   * Tamanho que a ficha terá depois de salvar: o da variante escolhida
+   * (Pequeno, Médio ou Grande, no golem) ou o padrão da raça.
+   */
+  const tamanhoDaRaca = useMemo(() => {
+    if (!race) return null;
+
+    return (raca.variant ? race.variants?.[raca.variant]?.size : undefined) ?? race.default_size;
+  }, [race, raca.variant]);
+
+  /**
    * Acerta o deslocamento quando a raça muda.
    *
    * O anão anda 6m, o hynne também (p. 20 e 27) — é regra da raça, e o campo
@@ -250,7 +260,7 @@ function EditForm({ character }: { character: Character }) {
         campaign_id: campaignId,
         race_id: raca.raceId,
         race_variant: raca.variant,
-        origin_id: originId,
+        origin_id: race?.skips_origin ? null : originId,
         deity_id: deityId,
         base_displacement: Number.parseInt(displacement, 10) || 9,
         proficiencies: proficiencies.trim() || null,
@@ -333,14 +343,23 @@ function EditForm({ character }: { character: Character }) {
             onChange={(escolha) => {
               setRaca(escolha);
               aplicarPadroesDaRaca(escolha.raceId);
+
+              // Golem: construído pronto, sem infância e sem origem.
+              const nova = reference.data?.races.find((entry) => entry.id === escolha.raceId);
+              if (nova?.skips_origin) setOriginId(null);
             }}
           />
 
-          {/* O tamanho não tem campo próprio: vem da raça e é aplicado ao
-              salvar, então precisa ao menos estar dito em algum lugar. */}
-          {race && race.default_size !== character.size.value ? (
+          {/* O tamanho não tem campo próprio: vem da raça — ou da variante,
+              no golem, que escolhe entre Pequeno, Médio e Grande — e é
+              aplicado ao salvar, então precisa ao menos estar dito. */}
+          {tamanhoDaRaca && tamanhoDaRaca !== character.size.value ? (
             <Text variant="small" tone="secondary">
-              Ao salvar, o tamanho passa a ser {tamanhoLegivel(race.default_size)} — é o da raça {race.name}.
+              Ao salvar, o tamanho passa a ser {tamanhoLegivel(tamanhoDaRaca)} —{' '}
+              {raca.variant && race?.variants?.[raca.variant]?.size
+                ? 'é o que você escolheu acima'
+                : `é o da raça ${race?.name}`}
+              .
             </Text>
           ) : null}
 
@@ -354,6 +373,12 @@ function EditForm({ character }: { character: Character }) {
             }))}
             onChange={setOriginId}
             clearable
+            disabled={race?.skips_origin ?? false}
+            hint={
+              race?.skips_origin
+                ? `${race.name} recebe um poder geral no lugar da origem.`
+                : undefined
+            }
           />
 
           <Select

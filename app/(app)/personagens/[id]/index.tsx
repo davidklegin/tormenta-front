@@ -160,36 +160,63 @@ function CombatContent({ characterId, character }: { characterId: number; charac
           </HelpNote>
 
           {/* RD fica no mesmo card: Defesa é acertar, RD é o quanto dói. */}
-          {character.damage_reduction.total > 0 ? (
+          {character.damage_reduction.total > 0 || character.damage_reduction.typed.length > 0 ? (
             <>
               <Divider />
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                <Text variant="bodyStrong" style={{ flex: 1 }}>
-                  Redução de dano
-                </Text>
-                <Text variant="numeric" tone="primary">
-                  {character.damage_reduction.total}
-                </Text>
-              </View>
+              {character.damage_reduction.total > 0 ? (
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                    <Text variant="bodyStrong" style={{ flex: 1 }}>
+                      Redução de dano
+                    </Text>
+                    <Text variant="numeric" tone="primary">
+                      {character.damage_reduction.total}
+                    </Text>
+                  </View>
 
-              {character.damage_reduction.breakdown.length > 1 ? (
-                <View style={{ gap: spacing.xs }}>
-                  {character.damage_reduction.breakdown.map((parte, index) => (
-                    <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text variant="small" tone="secondary">
-                        {parte.label}
-                      </Text>
-                      <Text variant="smallStrong">{signed(parte.value)}</Text>
+                  {character.damage_reduction.breakdown.length > 1 ? (
+                    <View style={{ gap: spacing.xs }}>
+                      {character.damage_reduction.breakdown.map((parte, index) => (
+                        <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text variant="small" tone="secondary">
+                            {parte.label}
+                          </Text>
+                          <Text variant="smallStrong">{signed(parte.value)}</Text>
+                        </View>
+                      ))}
                     </View>
-                  ))}
-                </View>
+                  ) : null}
+                </>
               ) : null}
 
+              {/* Reduções que valem só contra alguns tipos de dano — o chassi
+                  de pedra do golem tira 5 de corte, fogo e perfuração. Ficam
+                  fora do número grande porque ele sai de todo golpe, e estas
+                  só do golpe do tipo certo. */}
+              {character.damage_reduction.typed.map((parte, index) => (
+                <View
+                  key={index}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text variant="bodyStrong">Redução de {listarTipos(parte.types)}</Text>
+                    <Text variant="small" tone="secondary">
+                      {parte.label}
+                    </Text>
+                  </View>
+                  <Text variant="numeric" tone="primary">
+                    {parte.value}
+                  </Text>
+                </View>
+              ))}
+
               <HelpNote collapsible source="Livro base, p. 106">
-                {`A redução de dano sai de cada golpe que te acerta, antes de os PV caírem: com RD ${
-                  character.damage_reduction.total
-                }, um golpe de 8 tira ${Math.max(0, 8 - character.damage_reduction.total)}.`}
+                {character.damage_reduction.total > 0
+                  ? `A redução de dano sai de cada golpe que te acerta, antes de os PV caírem: com RD ${
+                      character.damage_reduction.total
+                    }, um golpe de 8 tira ${Math.max(0, 8 - character.damage_reduction.total)}.`
+                  : 'A redução de dano sai do golpe antes de os PV caírem — mas estas valem só contra os tipos de dano listados: contra os outros, o golpe chega inteiro.'}
               </HelpNote>
             </>
           ) : null}
@@ -277,4 +304,16 @@ function notaDoAtributoChave(character: Character): string | undefined {
   const origem = character.key_attribute.inherited ? ', pela classe' : '';
 
   return `Inclui ${character.key_attribute.label} ${signed(attributeValue(character, chave))} — atributo-chave${origem}.`;
+}
+
+/**
+ * "corte, fogo e perfuração" — os tipos de dano que uma redução alcança.
+ *
+ * A lista sai do catálogo já em português e pronta para ler; aqui é só a
+ * vírgula e o "e" do final, para a linha não virar um array na tela.
+ */
+function listarTipos(tipos: string[]): string {
+  if (tipos.length <= 1) return tipos[0] ?? '';
+
+  return `${tipos.slice(0, -1).join(', ')} e ${tipos[tipos.length - 1]}`;
 }

@@ -514,11 +514,18 @@ export type Character = {
     suggested: AttributeKey[];
   };
   defense: Calculation & { attribute: AttributeKey; other_bonus: number };
-  /** RD: `declared` é o que a ficha guarda, `total` inclui os poderes. */
+  /**
+   * RD: `declared` é o que a ficha guarda, `total` inclui os poderes.
+   *
+   * `typed` são as reduções que valem só contra alguns tipos de dano — o
+   * chassi de pedra do golem reduz corte, fogo e perfuração em 5. Ficam fora
+   * do total porque o total sai de todo golpe.
+   */
   damage_reduction: {
     total: number;
     declared: number;
     breakdown: { label: string; value: number }[];
+    typed: { label: string; value: number; types: string[] }[];
   };
   armor_penalty: number;
   /** Marcado, armadura e escudo param de penalizar (a sobrecarga continua). */
@@ -662,23 +669,61 @@ export type RaceBuildStep = {
   entries?: string[];
 };
 
+/**
+ * Habilidade de raça, do jeito que o catálogo a guarda.
+ *
+ * `effects` é o que a ficha soma sozinha (o +2 na Defesa do chassi de ferro);
+ * o resto é texto que o jogador lê — imunidades, a fonte de energia do golem,
+ * a maravilha mecânica do mashin —, e é justamente o que não vira número em
+ * lugar nenhum.
+ */
+export type RaceAbility = {
+  name: string;
+  text?: string;
+  /** O chassi dourado vem de Deuses e Heróis, não de Ameaças de Arton. */
+  source?: string;
+  creature_type?: string;
+  choose?: number;
+  options?: RaceBuildOption[];
+  effects?: {
+    target: string;
+    value?: number;
+    per_level?: number;
+    keys?: string[];
+    /** RD que só vale contra alguns tipos de dano (golem de pedra). */
+    types?: string[];
+  }[];
+};
+
 export type ReferenceRace = {
   id: number;
   key: string;
   name: string;
   attribute_modifiers: Partial<Record<AttributeKey, number>> | null;
+  /** O que a linha de modificadores não diz: no golem, que ela já é o total. */
+  attribute_note: string | null;
   free_choices: number;
   free_choice_bonus: number;
   /** Os +1 não podem empilhar no mesmo atributo (humano, duende). */
   distinct_choices: boolean;
   excluded_attributes: AttributeKey[] | null;
+  /**
+   * A escolha que muda os modificadores por inteiro: a herança do suraggel ou
+   * o tamanho do golem, que também manda no `size` da ficha. Os modificadores
+   * da variante são o total, não uma parcela a somar.
+   */
   variants: Record<
     string,
-    { name: string; attribute_modifiers: Partial<Record<AttributeKey, number>> }
+    { name: string; attribute_modifiers: Partial<Record<AttributeKey, number>>; size?: string }
   > | null;
+  /** Que pergunta o seletor de variante faz; null vale "Herança". */
+  variant_label: string | null;
   /** Só raças montáveis: null para quem tem ficha fixa. */
   build_steps: RaceBuildStep[] | null;
+  abilities: RaceAbility[] | null;
   creature_type: string | null;
+  /** Golem: recebe um poder geral no lugar da origem. */
+  skips_origin: boolean;
   default_size: string;
   /** Tamanho e deslocamento do duende saem do passo 2, não da ficha. */
   size_by_choice: boolean;
