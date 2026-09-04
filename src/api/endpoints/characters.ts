@@ -32,6 +32,8 @@ export type CharacterPayload = {
   classes?: { game_class_id?: number; key?: string; level?: number; is_primary?: boolean }[];
   defense_attribute?: string;
   defense_other_bonus?: number;
+  heavy_armor_keeps_defense_attribute?: boolean;
+  heavy_armor_keeps_displacement?: boolean;
   spell_attribute?: string | null;
   /** Atributo-chave somado aos PM; nulo herda o da classe primária. */
   key_attribute?: string | null;

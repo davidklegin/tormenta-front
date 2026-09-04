@@ -17,6 +17,9 @@ import { halfLevel, trainingBonus } from './progression';
 
 export const DEFENSE_BASE = 10;
 
+/** Os 3m que a armadura pesada tira do passo (p. 152). */
+export const HEAVY_ARMOR_DISPLACEMENT_PENALTY = 3;
+
 type DefenseItem = Pick<CharacterItem, 'category' | 'equipped' | 'defense_bonus' | 'armor_weight'>;
 
 /** Armadura pesada equipada — é ela que anula o atributo na Defesa (p. 152). */
@@ -34,19 +37,29 @@ export function wearsHeavyArmor(
  * O atributo aplicado é o escolhido na ficha; Destreza é o padrão do livro.
  * `blockedByHeavyArmor` avisa que a armadura pesada zerou essa parcela, para a
  * tela conseguir explicar o número em vez de só mostrá-lo.
+ *
+ * `keepsAttributeInHeavyArmor` é a dispensa da ficha — Armadura Brilhante e
+ * afins. Ligada, o atributo entra mesmo de cota de malha e a tela deixa de
+ * anunciar o bloqueio.
  */
 export function previewDefense(params: {
   attributeValue: number;
   items: DefenseItem[];
   otherBonus?: number;
+  keepsAttributeInHeavyArmor?: boolean;
 }): { total: number; attributePart: number; fromItems: number; blockedByHeavyArmor: boolean } {
-  const { attributeValue: value, items, otherBonus = 0 } = params;
+  const {
+    attributeValue: value,
+    items,
+    otherBonus = 0,
+    keepsAttributeInHeavyArmor = false,
+  } = params;
   const equipped = items.filter((item) => item.equipped);
 
   // Armadura pesada anula o atributo na Defesa (p. 152), seja ele qual for —
   // as habilidades que trocam o atributo repetem a restrição. Mesma leitura do
-  // DefenseCalculator no servidor.
-  const blockedByHeavyArmor = wearsHeavyArmor(equipped);
+  // DefenseCalculator no servidor, dispensa incluída.
+  const blockedByHeavyArmor = wearsHeavyArmor(equipped) && !keepsAttributeInHeavyArmor;
   const attributePart = blockedByHeavyArmor ? 0 : value;
 
   const fromItems = equipped
@@ -89,6 +102,33 @@ export function previewSkillValue(params: {
     otherBonus +
     (appliesArmorPenalty ? armorPenalty : 0)
   );
+}
+
+/**
+ * Deslocamento efetivo: o passo base menos os 3m da armadura pesada (p. 152).
+ *
+ * `keepsDisplacementInHeavyArmor` é a dispensa da ficha — o chassi de golem
+ * que anda igual de armadura. A redução por excesso de carga não entra aqui:
+ * é outra regra, e a prévia da tela de edição não mexe em carga.
+ */
+export function previewDisplacement(params: {
+  base: number;
+  items: Pick<CharacterItem, 'category' | 'equipped' | 'armor_weight'>[];
+  keepsDisplacementInHeavyArmor?: boolean;
+}): { total: number; reducedByHeavyArmor: boolean; waived: boolean } {
+  const { base, items, keepsDisplacementInHeavyArmor = false } = params;
+  const wearing = wearsHeavyArmor(items);
+  // `waived` é a dispensa fazendo efeito de verdade: marcada sem armadura
+  // pesada no corpo ela não devolve metro nenhum, e a tela não deve dizer que
+  // devolveu.
+  const waived = wearing && keepsDisplacementInHeavyArmor;
+  const reducedByHeavyArmor = wearing && !keepsDisplacementInHeavyArmor;
+
+  return {
+    total: Math.max(0, base - (reducedByHeavyArmor ? HEAVY_ARMOR_DISPLACEMENT_PENALTY : 0)),
+    reducedByHeavyArmor,
+    waived,
+  };
 }
 
 /** Limite de carga = 10 + 2 por ponto de Força (−1 se negativa) — p. 141. */

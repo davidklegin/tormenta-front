@@ -542,6 +542,19 @@ export type Character = {
   armor_penalty: number;
   /** Marcado, armadura e escudo param de penalizar (a sobrecarga continua). */
   ignores_armor_penalty: boolean;
+  /**
+   * As duas metades da armadura pesada (p. 152), dispensadas em separado.
+   *
+   * `wearing` diz se há armadura pesada equipada agora — sem ela as duas
+   * chaves não têm o que dispensar. Elas andam separadas porque as
+   * habilidades do livro também andam: os chassis de golem devolvem o passo,
+   * Armadura Brilhante devolve o atributo na Defesa.
+   */
+  heavy_armor: {
+    wearing: boolean;
+    keeps_defense_attribute: boolean;
+    keeps_displacement: boolean;
+  };
   carry: {
     limit: number;
     used: number;

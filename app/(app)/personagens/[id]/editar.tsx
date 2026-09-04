@@ -28,7 +28,14 @@ import {
 import { useLinkableCampaigns } from '@/hooks/useCampaigns';
 import { useCharacter, useDeleteCharacter, useUpdateCharacter } from '@/hooks/useCharacters';
 import { useReference } from '@/hooks/useReference';
-import { ATTRIBUTE_LABELS, ATTRIBUTE_ORDER, describeOrigin, previewDefense, signed } from '@/rules';
+import {
+  ATTRIBUTE_LABELS,
+  ATTRIBUTE_ORDER,
+  describeOrigin,
+  previewDefense,
+  previewDisplacement,
+  signed,
+} from '@/rules';
 import { ArquivoGrandeDemaisError } from '@/utils/arquivo';
 import { prepararImagemParaUpload } from '@/utils/imagem';
 import { spacing } from '@/theme';
@@ -87,6 +94,12 @@ function EditForm({ character }: { character: Character }) {
   const [defenseAttribute, setDefenseAttribute] = useState<AttributeKey>(character.defense.attribute);
   const [damageReduction, setDamageReduction] = useState(String(character.damage_reduction.declared));
   const [ignoresArmorPenalty, setIgnoresArmorPenalty] = useState(character.ignores_armor_penalty);
+  const [keepsDefenseAttribute, setKeepsDefenseAttribute] = useState(
+    character.heavy_armor.keeps_defense_attribute
+  );
+  const [keepsDisplacement, setKeepsDisplacement] = useState(
+    character.heavy_armor.keeps_displacement
+  );
   const [attributes, setAttributes] = useState<Record<AttributeKey, string>>(
     () =>
       Object.fromEntries(
@@ -179,8 +192,23 @@ function EditForm({ character }: { character: Character }) {
         attributeValue: previewAttributeTotal(defenseAttribute),
         items: character.items,
         otherBonus: Number.parseInt(defenseOther, 10) || 0,
+        keepsAttributeInHeavyArmor: keepsDefenseAttribute,
       }),
-    [character.items, defenseAttribute, defenseOther, attributes]
+    [character.items, defenseAttribute, defenseOther, keepsDefenseAttribute, attributes]
+  );
+
+  /**
+   * Prévia do passo com a dispensa ainda em edição. A sobrecarga fica de fora
+   * — é outra regra, e o número gravado na ficha já a desconta.
+   */
+  const displacementPreview = useMemo(
+    () =>
+      previewDisplacement({
+        base: Number.parseInt(displacement, 10) || 0,
+        items: character.items,
+        keepsDisplacementInHeavyArmor: keepsDisplacement,
+      }),
+    [character.items, displacement, keepsDisplacement]
   );
 
   /**
@@ -268,6 +296,8 @@ function EditForm({ character }: { character: Character }) {
         defense_other_bonus: Number.parseInt(defenseOther, 10) || 0,
         damage_reduction: Math.max(0, Number.parseInt(damageReduction, 10) || 0),
         ignores_armor_penalty: ignoresArmorPenalty,
+        heavy_armor_keeps_defense_attribute: keepsDefenseAttribute,
+        heavy_armor_keeps_displacement: keepsDisplacement,
         attributes: Object.fromEntries(
           ATTRIBUTE_ORDER.map((key) => [key, Number.parseInt(attributes[key] ?? '0', 10) || 0])
         ),
@@ -476,8 +506,8 @@ function EditForm({ character }: { character: Character }) {
             A Defesa começa em 10 e soma o atributo escolhido aqui mais o que armadura e escudo derem.
             Destreza (★) é o padrão do livro, mas há habilidades que trocam esse atributo — Autoconfiança do
             nobre soma Carisma, Couraceiro do inventor soma Inteligência. Armadura pesada anula essa parcela
-            seja qual for o atributo; quem tem uma exceção, como Armadura Brilhante, registra o valor em
-            "Outros bônus".
+            seja qual for o atributo; quem tem uma exceção, como Armadura Brilhante, marca a dispensa logo
+            abaixo em vez de somar o valor à mão em "Outros bônus".
           </HelpNote>
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
@@ -522,6 +552,13 @@ function EditForm({ character }: { character: Character }) {
             onChange={setIgnoresArmorPenalty}
             hint="Para quem tem habilidade que anula a penalidade da armadura e do escudo em Acrobacia, Furtividade e Ladinagem. O −5 por excesso de carga continua valendo."
           />
+
+          <Checkbox
+            label="Armadura pesada não anula o atributo na Defesa"
+            checked={keepsDefenseAttribute}
+            onChange={setKeepsDefenseAttribute}
+            hint="Para quem tem a exceção, como Armadura Brilhante (nobre, 8º nível). Só devolve o atributo na Defesa; os 3m de deslocamento têm caixa própria em Combate e progressão."
+          />
         </View>
       </Card>
 
@@ -540,6 +577,17 @@ function EditForm({ character }: { character: Character }) {
             keyboardType="number-pad"
             hint="Padrão 9m; anões e hynne usam 6m."
           />
+
+          <Checkbox
+            label="Armadura pesada não reduz o deslocamento"
+            checked={keepsDisplacement}
+            onChange={setKeepsDisplacement}
+            hint="Para quem anda igual de armadura completa — os chassis de golem, por exemplo. Os 3m por excesso de carga continuam valendo."
+          />
+
+          <Text variant="small" tone="secondary">
+            {describeDisplacement(displacementPreview)}
+          </Text>
           <Input
             label="Proficiências"
             value={proficiencies}
@@ -591,6 +639,22 @@ function tamanhoLegivel(size: string): string {
   };
 
   return nomes[size] ?? size;
+}
+
+/**
+ * O passo em uma linha: quanto sai da ficha e o que a armadura pesada fez com
+ * ele — ou deixou de fazer, quando a dispensa está marcada.
+ */
+function describeDisplacement(preview: ReturnType<typeof previewDisplacement>): string {
+  if (preview.reducedByHeavyArmor) {
+    return `Deslocamento: armadura pesada −3m → ${preview.total}m`;
+  }
+
+  if (preview.waived) {
+    return `Deslocamento: ${preview.total}m — a armadura pesada não reduz`;
+  }
+
+  return `Deslocamento: ${preview.total}m`;
 }
 
 function describeDefense(
