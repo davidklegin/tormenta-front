@@ -81,7 +81,7 @@ export function ConditionManager({
                   condition.is_incapacitating ? 'danger' : condition.severity >= 3 ? 'warning' : 'neutral'
                 }
                 onPress={() => setDetalhe(condition)}
-                onRemove={editable ? () => remove.mutate(condition.condition_id) : undefined}
+                onRemove={editable && condition.condition_id ? () => remove.mutate(condition.condition_id!) : undefined}
               />
             ))}
           </View>
@@ -229,12 +229,12 @@ export function ConditionManager({
           </Text>
         ) : null}
 
-        {editable && detalhe ? (
+        {editable && detalhe && detalhe.condition_id ? (
           <Button
             label="Remover condição"
             variant="danger"
             onPress={() => {
-              remove.mutate(detalhe.condition_id);
+              remove.mutate(detalhe.condition_id!);
               setDetalhe(null);
             }}
           />

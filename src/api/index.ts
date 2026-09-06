@@ -13,7 +13,7 @@ export { tokenStorage, apiUrlStorage } from './storage';
 export { authApi } from './endpoints/auth';
 export { campaignsApi } from './endpoints/campaigns';
 export { charactersApi } from './endpoints/characters';
-export { combatApi, type CombatEntryInput } from './endpoints/combat';
+export { combatApi, type CombatBuffInput, type CombatEntryInput } from './endpoints/combat';
 export type { CharacterPayload, VitalsPayload, VitalsResponse } from './endpoints/characters';
 export { powersApi } from './endpoints/powers';
 export { referenceApi } from './endpoints/reference';

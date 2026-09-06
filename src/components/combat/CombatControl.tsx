@@ -3,6 +3,7 @@ import { Pressable, View } from 'react-native';
 import type { CombatEntryInput } from '@/api';
 import type { CombatState } from '@/api/types';
 import { Button, Card, Chip, EmptyState, Icon, Input, Loading, Text } from '@/components/ui';
+import { CombatBuffPanel } from '@/components/combat/CombatBuffPanel';
 import { useCampaignCharacters } from '@/hooks/useCampaigns';
 import { useCombat, useCombatControls } from '@/hooks/useCombat';
 import { radius, spacing, stroke, useTheme } from '@/theme';
@@ -125,6 +126,9 @@ function EmAndamento({ campaignId, combate }: { campaignId: number; combate: Com
           );
         })}
       </View>
+
+      {/* Painel para aplicar buffs/condições em grupo */}
+      <CombatBuffPanel campaignId={campaignId} />
     </View>
   );
 }

@@ -427,16 +427,42 @@ export type CharacterClassAbility = {
 
 export type CharacterCondition = {
   id: number;
-  condition_id: number;
-  key: string;
+  condition_id: number | null;
+  key: string | null;
   name: string;
   description?: string | null;
+  is_custom: boolean;
+  is_buff: boolean;
   effect_type: string | null;
   severity: number;
   is_incapacitating: boolean;
+  modifiers: {
+    attack?: number;
+    damage?: number;
+    defense?: number;
+    fortitude?: number;
+    reflex?: number;
+    will?: number;
+    skills?: number;
+    initiative?: number;
+  };
   value: number | null;
   duration_note: string | null;
   notes?: string | null;
+  applied_at?: string | null;
+  applied_by?: string | null;
+};
+
+/** Resultado de aplicar um buff coletivo. */
+export type CombatBuffApplied = {
+  character_id: number;
+  character_name: string;
+  effect: CharacterCondition;
+};
+
+export type CombatBuffResult = {
+  message: string;
+  data: CombatBuffApplied[];
 };
 
 /** Onde um efeito incide. Sem escopo, vale para todas as perícias. */
