@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { ApiError, authApi } from '@/api';
 import { Button, Card, Chip, Input, Screen, Text } from '@/components/ui';
+import { PushNotificationButton } from '@/components/ui/PushNotificationButton';
 import { PageHeader } from '@/components/layout';
 import { closeRealtime } from '@/realtime/useCampaignChannel';
 import { useAuthStore } from '@/store/auth';
@@ -105,6 +106,8 @@ export default function ProfileScreen() {
           </Text>
         </Card>
       ) : null}
+
+      <PushNotificationButton />
 
       <Card title="Seus dados">
         <View style={{ gap: spacing.md }}>
