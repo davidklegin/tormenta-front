@@ -5,17 +5,25 @@ import type { MasterDashboard } from '@/api/types';
 import { Button, Card, Chip, EmptyState, SegmentedControl, Text } from '@/components/ui';
 import { ResponsiveGrid } from '@/components/layout';
 import { CharacterStatusCard } from '@/components/campaign/CharacterStatusCard';
+import { CombatControl } from '@/components/combat';
 import { spacing, useResponsive, useTheme } from '@/theme';
 
 type SortMode = 'name' | 'hp' | 'conditions';
 
 /**
- * Como a mesa está agora: PV, PM e condições de cada personagem.
+ * Como a mesa está agora: a ordem de iniciativa, e o PV, o PM e as condições
+ * de cada personagem.
  *
  * Componente, e não tela, porque divide espaço com a mesa de controle numa
  * aba ao lado — durante a sessão o mestre alterna entre "como estão os
  * jogadores" e "o que eles estão vendo" o tempo todo, e cada alternância que
  * custasse uma navegação seria uma a menos que ele faria.
+ *
+ * O combate entra aqui, e não numa terceira aba, pelo mesmo motivo levado ao
+ * limite: em combate as duas perguntas do mestre são "de quem é a vez" e
+ * "quanto ele ainda aguenta", e ele as faz alternadamente a cada trinta
+ * segundos. A ordem fica no alto porque é o que ele toca; os cards continuam
+ * logo abaixo, no mesmo campo de visão.
  *
  * A ordenação por PV coloca quem está em apuros no topo, que é a pergunta
  * mais frequente do mestre.
@@ -65,6 +73,10 @@ export function MasterDashboardPanel({ campaignId, dashboard }: { campaignId: nu
         />
         <SummaryTile label="Condições" value={summary.conditions} />
       </View>
+
+      {/* A iniciativa: faixa de comando em combate, uma linha discreta fora
+          dele. Só aparece para quem pode mexer nela (ver CombatControl). */}
+      <CombatControl campaignId={campaignId} />
 
       <View
         style={{ flexDirection: isDesktop ? 'row' : 'column', gap: spacing.lg, alignItems: 'flex-start' }}

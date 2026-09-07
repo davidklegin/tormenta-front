@@ -23,6 +23,7 @@ import { ShowcaseButton } from '@/components/showcase';
 import { useReference } from '@/hooks/useReference';
 import { SPELL_CIRCLE_COST } from '@/rules';
 import { radius, spacing, useTheme } from '@/theme';
+import { contemTermo, normalizar } from '@/utils/texto';
 
 /**
  * Aba Magias (briefing §12).
@@ -66,10 +67,10 @@ function SpellsContent({ characterId, character }: { characterId: number; charac
   });
 
   const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase();
+    const term = normalizar(query.trim());
 
     return character.spells.filter((spell) => {
-      if (term && !spell.name.toLowerCase().includes(term)) return false;
+      if (term && !contemTermo(spell.name, term)) return false;
       if (circle !== 'todos' && spell.circle !== Number(circle)) return false;
 
       return true;

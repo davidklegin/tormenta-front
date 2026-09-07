@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import type { ImagePickerAsset } from 'expo-image-picker';
 
 import { ArquivoGrandeDemaisError, TAMANHO_MAXIMO_BYTES } from '@/utils/arquivo';
@@ -37,6 +38,29 @@ export async function prepararImagemParaUpload(
     name: trocarExtensao(asset.fileName ?? nomePadrao, extensaoDoTipo(tipo)),
     type: tipo,
   };
+}
+
+/**
+ * Monta o corpo do upload de uma imagem.
+ *
+ * As duas plataformas pedem coisas diferentes, e essa é a única razão de esta
+ * função existir. No celular o FormData do React Native aceita o objeto
+ * `{uri, name, type}` e resolve o arquivo sozinho. Na web o FormData é o do
+ * navegador, que só entende Blob: passar o mesmo objeto ali não dá erro — ele
+ * vira a string `[object Object]`, sobe assim, e o servidor responde
+ * `validation.image` sem que nada na tela explique o motivo.
+ */
+export async function formDeImagem(campo: string, imagem: ImagemEnviavel): Promise<FormData> {
+  const form = new FormData();
+
+  if (Platform.OS === 'web') {
+    const resposta = await fetch(imagem.uri);
+    form.append(campo, await resposta.blob(), imagem.name);
+  } else {
+    form.append(campo, { uri: imagem.uri, name: imagem.name, type: imagem.type } as never);
+  }
+
+  return form;
 }
 
 /**

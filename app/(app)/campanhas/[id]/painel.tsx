@@ -4,7 +4,6 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Button, ErrorState, Icon, Loading, Screen, SegmentedControl } from '@/components/ui';
 import { PageHeader } from '@/components/layout';
 import { MasterDashboardPanel } from '@/components/campaign/MasterDashboardPanel';
-import { CombatControl } from '@/components/combat';
 import { RealtimeIndicator } from '@/components/campaign/RealtimeIndicator';
 import { StageControl, abrirPalco } from '@/components/stage';
 import { useMasterDashboard } from '@/hooks/useCampaigns';
@@ -12,7 +11,7 @@ import { useCampaignChannel } from '@/realtime/useCampaignChannel';
 import { useAuthStore } from '@/store/auth';
 import { useTheme } from '@/theme';
 
-type Aba = 'painel' | 'mesa' | 'combate';
+type Aba = 'painel' | 'mesa';
 
 /**
  * A tela do mestre durante a sessão.
@@ -23,10 +22,14 @@ type Aba = 'painel' | 'mesa' | 'combate';
  * custava uma navegação — e cadastrar um NPC no meio da cena custava duas.
  *
  * A mesa de controle traz o acervo dentro dela pelo mesmo motivo: cadastrar e
- * exibir são o mesmo gesto, feito no mesmo minuto.
+ * exibir são o mesmo gesto, feito no mesmo minuto. E a iniciativa deixou de ser
+ * a terceira aba pelo mesmo motivo ainda: durante o combate ela é lida junto
+ * com os PV, alternadamente, e agora as duas coisas estão na mesma tela (ver
+ * MasterDashboardPanel).
  *
  * `?aba=mesa` abre direto na mesa de controle, para os atalhos que vêm da tela
- * da campanha caírem no lugar certo.
+ * da campanha caírem no lugar certo. `?aba=combate` é o endereço antigo da aba
+ * de iniciativa e cai no painel, que é onde ela passou a morar.
  */
 export default function MasterScreen() {
   const { colors } = useTheme();
@@ -36,7 +39,7 @@ export default function MasterScreen() {
 
   const isPlatformMaster = useAuthStore((estado) => estado.user?.is_master ?? false);
 
-  const abaPedida = params.aba === 'mesa' || params.aba === 'combate' ? params.aba : 'painel';
+  const abaPedida: Aba = params.aba === 'mesa' ? 'mesa' : 'painel';
   const [aba, setAba] = useState<Aba>(isPlatformMaster ? abaPedida : 'painel');
 
   const dashboard = useMasterDashboard(campaignId);
@@ -109,17 +112,14 @@ export default function MasterScreen() {
           segments={[
             { value: 'painel', label: 'Painel da mesa' },
             { value: 'mesa', label: 'Mesa de controle' },
-            { value: 'combate', label: 'Iniciativa' },
           ]}
         />
       ) : null}
 
-      {aba === 'painel' || !isPlatformMaster ? (
-        <MasterDashboardPanel campaignId={campaignId} dashboard={dashboard.data} />
-      ) : aba === 'mesa' ? (
+      {aba === 'mesa' && isPlatformMaster ? (
         <StageControl campaignId={campaignId} />
       ) : (
-        <CombatControl campaignId={campaignId} />
+        <MasterDashboardPanel campaignId={campaignId} dashboard={dashboard.data} />
       )}
     </Screen>
   );

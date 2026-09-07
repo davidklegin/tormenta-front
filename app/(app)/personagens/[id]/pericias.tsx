@@ -8,6 +8,7 @@ import { Card, Chip, HelpNote, Input, SegmentedControl, Sheet, Text } from '@/co
 import { SheetScreen } from '@/components/character/SheetScreen';
 import { signed } from '@/rules';
 import { radius, spacing, stroke, useTheme } from '@/theme';
+import { contemTermo, normalizar } from '@/utils/texto';
 
 type Filter = 'todas' | 'treinadas' | 'usaveis';
 
@@ -84,10 +85,10 @@ function SkillsContent({ characterId, character }: { characterId: number; charac
   const canEdit = character.permissions.can_update;
 
   const skills = useMemo(() => {
-    const term = query.trim().toLowerCase();
+    const term = normalizar(query.trim());
 
     return character.skills.filter((skill) => {
-      if (term && !skill.name.toLowerCase().includes(term)) return false;
+      if (term && !contemTermo(skill.name, term)) return false;
       if (filter === 'treinadas') return skill.trained;
       if (filter === 'usaveis') return skill.usable;
 

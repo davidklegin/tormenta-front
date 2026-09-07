@@ -6,6 +6,43 @@ export type CombatEntryInput = {
   name?: string;
   initiative: number;
   character_id?: number | null;
+  stage_item_id?: number | null;
+  current_hp?: number;
+  max_hp?: number;
+  current_mp?: number;
+  max_mp?: number;
+  temp_hp?: number;
+};
+
+/** Dados para aplicar dano ou cura. */
+export type ApplyDamageInput = {
+  entry_id: string;
+  amount: number;
+  damage_temp_first?: boolean;
+};
+
+/** Dados para atualizar stats de um participante. */
+export type UpdateStatsInput = {
+  entry_id: string;
+  current_hp?: number;
+  max_hp?: number;
+  current_mp?: number;
+  max_mp?: number;
+  temp_hp?: number;
+};
+
+/** Dados para adicionar uma condição. */
+export type AddConditionInput = {
+  entry_id: string;
+  condition_key: string;
+  duration?: number;
+  notes?: string;
+};
+
+/** Dados para remover uma condição. */
+export type RemoveConditionInput = {
+  entry_id: string;
+  condition_id: string;
 };
 
 /** Dados para aplicar um buff coletivo. */
@@ -60,6 +97,43 @@ export const combatApi = {
     apiRequest<Envelope<CombatState>>(`/campaigns/${campaignId}/combat`, { method: 'DELETE' }).then(
       (r) => r.data
     ),
+
+  // Dano e stats individuais
+
+  applyDamage: (campaignId: number, input: ApplyDamageInput) =>
+    apiRequest<Envelope<CombatState>>(`/campaigns/${campaignId}/combat/damage`, {
+      method: 'POST',
+      body: input,
+    }).then((r) => r.data),
+
+  undoDamage: (campaignId: number) =>
+    apiRequest<Envelope<CombatState>>(`/campaigns/${campaignId}/combat/damage/undo`, {
+      method: 'POST',
+    }).then((r) => r.data),
+
+  reorder: (campaignId: number, entryIds: string[]) =>
+    apiRequest<Envelope<CombatState>>(`/campaigns/${campaignId}/combat/reorder`, {
+      method: 'POST',
+      body: { entry_ids: entryIds },
+    }).then((r) => r.data),
+
+  updateStats: (campaignId: number, input: UpdateStatsInput) =>
+    apiRequest<Envelope<CombatState>>(`/campaigns/${campaignId}/combat/stats`, {
+      method: 'POST',
+      body: input,
+    }).then((r) => r.data),
+
+  addCondition: (campaignId: number, input: AddConditionInput) =>
+    apiRequest<Envelope<CombatState>>(`/campaigns/${campaignId}/combat/conditions`, {
+      method: 'POST',
+      body: input,
+    }).then((r) => r.data),
+
+  removeCondition: (campaignId: number, input: RemoveConditionInput) =>
+    apiRequest<Envelope<CombatState>>(`/campaigns/${campaignId}/combat/conditions`, {
+      method: 'DELETE',
+      body: input,
+    }).then((r) => r.data),
 
   // Buffs coletivos
 

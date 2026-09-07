@@ -939,14 +939,48 @@ export type CampaignSession = {
  * `is_npc` diz qual é qual. `user_id` existe para o app saber, sem consultar
  * nada, que aquela vez é do jogador que está olhando a tela.
  */
+/** Condição aplicada a um participante do combate. */
+export type CombatCondition = {
+  id: string;
+  key: string;
+  duration: number | null;
+  applied_at_round: number;
+  applied_by_entry_id: string | null;
+  notes: string | null;
+};
+
 export type CombatEntry = {
   id: string;
   name: string;
   initiative: number;
   character_id: number | null;
+  stage_item_id: number | null;
   user_id: number | null;
   avatar_url: string | null;
   is_npc: boolean;
+  current_hp: number;
+  max_hp: number;
+  current_mp: number | null;
+  max_mp: number | null;
+  temp_hp: number;
+  conditions: CombatCondition[];
+};
+
+/**
+ * Uma aplicação de dano já feita, guardada para poder ser desfeita.
+ *
+ * Traz o PV de ANTES, e não só o valor aplicado: dano que bateu no piso ou
+ * cura que bateu no teto não voltariam certo por aritmética invertida.
+ */
+export type CombatDamageLogEntry = {
+  id: string;
+  entry_id: string;
+  entry_name: string;
+  amount: number;
+  hp_before: number;
+  temp_before: number;
+  round: number;
+  at: string;
 };
 
 export type CombatState = {
@@ -956,6 +990,7 @@ export type CombatState = {
   entries: CombatEntry[];
   current: CombatEntry | null;
   next: CombatEntry | null;
+  damage_log: CombatDamageLogEntry[];
   updated_at: string | null;
 };
 
@@ -1086,4 +1121,77 @@ export type ShowcaseEvent = ShowcaseContent & {
     avatar_url: string | null;
   };
   shared_at: string;
+};
+
+// --------------------------------------------------- tabuleiro virtual
+
+/**
+ * De onde a peça no tabuleiro tira nome e retrato.
+ *
+ * `stage_item` é o acervo do mestre — o bestiário que a campanha realmente
+ * tem, já com o NPC cadastrado, o retrato e a ficha. `creature` fica para
+ * quando existir um catálogo de criaturas da plataforma; `generic` é o
+ * marcador sem ficha: um barril, uma armadilha, o corpo caído.
+ */
+export type TokenEntityType = 'player_character' | 'stage_item' | 'creature' | 'generic';
+
+export type BattleMapToken = {
+  id: number;
+  entity_type: TokenEntityType;
+  entity_id: number | null;
+  position: { x: number; y: number };
+  size: number;
+  name: string;
+  image_url: string | null;
+  conditions: string[];
+  visible: boolean;
+};
+
+export type AreaEffectShape = 'circle' | 'cone' | 'line' | 'cube';
+
+export type AreaEffect = {
+  id: string;
+  shape: AreaEffectShape;
+  x: number;
+  y: number;
+  radius?: number;
+  length?: number;
+  width?: number;
+  direction?: number;
+  color?: string;
+  opacity?: number;
+  label?: string;
+};
+
+export type FogRegion = {
+  points: { x: number; y: number }[];
+};
+
+export type BattleMapGrid = {
+  width: number;
+  height: number;
+  scale: number;
+  offset_x: number;
+  offset_y: number;
+};
+
+export type BattleMapState = {
+  id: number | null;
+  name: string | null;
+  background_url: string | null;
+  grid: BattleMapGrid | null;
+  fog_regions: FogRegion[];
+  area_effects: AreaEffect[];
+  tokens: BattleMapToken[];
+  state: 'preparing' | 'active' | 'paused' | 'ended' | null;
+  /**
+   * Este payload é a visão do mestre?
+   *
+   * Vem do servidor porque é lá que o corte acontece: o jogador nunca recebe
+   * o token escondido nem a criatura sob a névoa. A tela usa isto para saber
+   * se pode oferecer os controles de mestre, não para decidir o que desenhar
+   * — o que chegou já é tudo o que aquela pessoa pode ver.
+   */
+  is_master_view: boolean;
+  updated_at: string | null;
 };

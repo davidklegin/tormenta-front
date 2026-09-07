@@ -83,7 +83,12 @@ export function Sheet({ visible, onClose, title, subtitle, children, footer }: S
               borderRadius: radius.lg,
               borderWidth: stroke.hairline,
               borderColor: colors.border,
-              width: isPhone ? '100%' : 560,
+              // No celular o painel ocupa a largura toda; nas telas maiores
+              // vai a 80% da janela. Formulários como o da peça do acervo têm
+              // texto longo, lista de fatos e tira de anexos — em 560px eles
+              // rolavam por três telas enquanto sobrava pergaminho dos dois
+              // lados. Pedido de 2026-09-07.
+              width: isPhone ? '100%' : '80%',
               maxWidth: '100%',
               maxHeight: '88%',
               // No celular o painel sobe de baixo e pode chegar perto da barra
@@ -157,11 +162,24 @@ export function Sheet({ visible, onClose, title, subtitle, children, footer }: S
                 padding: spacing.space4,
                 borderTopWidth: stroke.hairline,
                 borderTopColor: colors.border,
-                flexDirection: 'row',
-                gap: spacing.space2,
+                alignItems: 'flex-end',
               }}
             >
-              {footer}
+              {/* Os botões não acompanham a largura do painel. Num diálogo de
+                  1100px, "Salvar" esticado vira uma faixa de meio metro — o
+                  botão fica grande, não fica mais fácil de achar. No celular,
+                  em que a largura toda é a do polegar, eles continuam
+                  ocupando a linha inteira. */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  gap: spacing.space2,
+                  width: '100%',
+                  maxWidth: isPhone ? undefined : 420,
+                }}
+              >
+                {footer}
+              </View>
             </View>
           ) : null}
         </Animated.View>

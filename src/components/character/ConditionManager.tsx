@@ -5,6 +5,7 @@ import type { CharacterCondition } from '@/api/types';
 import { useCharacterConditions } from '@/hooks/useCharacters';
 import { useReference } from '@/hooks/useReference';
 import { hitSize, radius, spacing, stroke, useTheme } from '@/theme';
+import { contemTermo, normalizar } from '@/utils/texto';
 
 /**
  * Condições ativas (briefing §19).
@@ -50,9 +51,9 @@ export function ConditionManager({
   );
 
   const filtradas = useMemo(() => {
-    const termo = busca.trim().toLowerCase();
+    const termo = normalizar(busca.trim());
 
-    return termo ? catalogo.filter((c) => c.name.toLowerCase().includes(termo)) : catalogo;
+    return termo ? catalogo.filter((c) => contemTermo(c.name, termo)) : catalogo;
   }, [catalogo, busca]);
 
   return (

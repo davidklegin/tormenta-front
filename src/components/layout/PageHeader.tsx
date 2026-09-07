@@ -42,7 +42,12 @@ export function PageHeader({ title, subtitle, back, backLabel, actions }: PageHe
           flexWrap: isPhone ? 'wrap' : 'nowrap',
         }}
       >
-        <View style={{ flex: 1, minWidth: 0, gap: spacing.xxs }}>
+        {/* No celular o título toma a linha inteira e as ações descem para a
+            de baixo. Com `minWidth: 0` ele cedia toda a largura aos botões:
+            no Painel do Mestre, com quatro ações no cabeçalho, "Painel do
+            Mestre" e o nome da campanha ficavam espremidos em dois pixels —
+            uma coluna de letras cortadas. */}
+        <View style={{ flex: 1, minWidth: isPhone ? '100%' : 0, gap: spacing.xxs }}>
           <Text variant={isPhone ? 'title' : 'display'} numberOfLines={2}>
             {title}
           </Text>

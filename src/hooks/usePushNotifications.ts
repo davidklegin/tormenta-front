@@ -38,6 +38,26 @@ function prefixoDoApp(): string {
 }
 
 /**
+ * O aplicativo está aberto a partir da Tela de Início, e não numa aba.
+ *
+ * `navigator.standalone` é a resposta do Safari no iOS; o `display-mode` é a
+ * dos demais. No iOS a diferença decide se há notificação: fora da Tela de
+ * Início ela não existe.
+ */
+function naTelaDeInicio(): boolean {
+  const safari = (window.navigator as Navigator & { standalone?: boolean }).standalone;
+
+  return safari === true || window.matchMedia?.('(display-mode: standalone)').matches === true;
+}
+
+function ehIOS(): boolean {
+  const ua = window.navigator.userAgent;
+
+  // O iPad se apresenta como Mac desde o iPadOS 13; o toque é o que o entrega.
+  return /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && window.navigator.maxTouchPoints > 1);
+}
+
+/**
  * Notificações do navegador para o aviso de "é sua vez".
  *
  * Só na web: no aplicativo nativo o aviso chega pelo canal do Reverb
@@ -206,6 +226,15 @@ export function usePushNotifications() {
   return {
     state,
     isSupported,
+    /*
+     * No iPhone e no iPad o Push existe só no aplicativo da Tela de Início —
+     * numa aba do Safari o `PushManager` sequer é definido (WebKit, iOS 16.4).
+     * Sem distinguir esse caso do "navegador que não suporta", a tela sumia
+     * inteira no iPhone: o jogador não via nem a opção, nem o motivo, nem o
+     * que fazer para ter o aviso.
+     */
+    precisaDaTelaDeInicio:
+      !isSupported && Platform.OS === 'web' && typeof window !== 'undefined' && ehIOS() && !naTelaDeInicio(),
     /** O servidor está sem as chaves VAPID: não há o que ativar. */
     isUnavailable: vapidQuery.isError,
     isLoading: subscribeMutation.isPending || unsubscribeMutation.isPending,

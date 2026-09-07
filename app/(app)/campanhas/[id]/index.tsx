@@ -27,6 +27,7 @@ import {
   useCampaignNotes,
   useJoinPublicCampaign,
 } from '@/hooks/useCampaigns';
+import { useBattleMap } from '@/hooks/useBattleMap';
 import { useNextSession } from '@/hooks/useCampaignSessions';
 import { useStage } from '@/hooks/useStage';
 import { useCampaignChannel } from '@/realtime/useCampaignChannel';
@@ -163,6 +164,10 @@ export default function CampaignScreen() {
           responde, e um card convidando o visitante a abrir uma tela que ele
           não pode ver seria só uma porta trancada. */}
       {data.is_member ? <PalcoDaSessao campaignId={campaignId} isPlatformMaster={isPlatformMaster} /> : null}
+
+      {/* O tabuleiro, pelo mesmo motivo do palco: é da sessão ao vivo, e só
+          quem senta à mesa alcança. */}
+      {data.is_member ? <TabuleiroDaSessao campaignId={campaignId} /> : null}
 
       {/* Anotações em destaque: é o que a mesa mais consulta entre as sessões,
           então mostra o conteúdo, e não só um botão para outro lugar. */}
@@ -487,6 +492,56 @@ function PalcoDaSessao({
             />
           ) : null}
         </View>
+      </View>
+    </Card>
+  );
+}
+
+/**
+ * O tabuleiro, visto da tela da campanha.
+ *
+ * Como o palco, mostra o que está em cima da mesa antes de oferecer a porta:
+ * "Cripta de Tannah-Toh, 7 peças" responde de relance se o combate da semana
+ * passada continua montado — que é a pergunta de quem abre o app no dia da
+ * sessão seguinte.
+ */
+function TabuleiroDaSessao({ campaignId }: { campaignId: number }) {
+  const { colors } = useTheme();
+
+  const tabuleiro = useBattleMap(campaignId);
+  const mapa = tabuleiro.data;
+  const aberto = Boolean(mapa?.id);
+
+  // Quem monta o tabuleiro é quem o servidor reconhece como dono do palco, e
+  // não todo mestre de mesa — prometer "Montar" a quem levaria 403 lá dentro
+  // é pior do que não oferecer.
+  const podeMontar = mapa?.is_master_view ?? false;
+
+  return (
+    <Card>
+      <View style={{ gap: spacing.md }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <Icon name="pericias" size={20} color={colors.textMuted} />
+          <Text variant="heading" style={{ flex: 1 }}>
+            Tabuleiro
+          </Text>
+          {mapa?.state === 'active' ? <Chip label="em combate" compact tone="danger" /> : null}
+        </View>
+
+        <Text variant="small" tone={aberto ? 'default' : 'muted'} numberOfLines={2}>
+          {aberto
+            ? `${mapa?.name} — ${mapa?.tokens.length ?? 0} peça${(mapa?.tokens.length ?? 0) === 1 ? '' : 's'} no mapa.`
+            : podeMontar
+              ? 'Nenhum mapa na mesa. Monte um para o próximo combate.'
+              : 'O mestre ainda não pôs um mapa na mesa.'}
+        </Text>
+
+        <Button
+          label={aberto ? 'Abrir o tabuleiro' : podeMontar ? 'Montar o tabuleiro' : 'Ver o tabuleiro'}
+          variant={aberto ? 'primary' : 'secondary'}
+          onPress={() => router.push(`/(app)/campanhas/${campaignId}/tabuleiro`)}
+          fullWidth
+        />
       </View>
     </Card>
   );

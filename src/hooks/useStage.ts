@@ -38,6 +38,10 @@ export function useStageItems(
     queryKey: [...stageKeys.items(campaignId ?? 0), filters?.q ?? '', filters?.kind ?? ''],
     queryFn: () => stageApi.items(campaignId as number, filters),
     enabled: Boolean(campaignId) && enabled,
+    // Cada letra digitada é uma chave de cache nova. Sem segurar a lista
+    // anterior, o acervo inteiro some e volta a cada busca — e o mestre perde
+    // de vista a peça que estava procurando bem quando termina de escrevê-la.
+    placeholderData: (anterior) => anterior,
   });
 }
 

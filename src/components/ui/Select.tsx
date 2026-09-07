@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { radius, spacing, stroke, useTheme } from '@/theme';
+import { contemTermo, normalizar } from '@/utils/texto';
 import { Icon } from './Icon';
 import { Input } from './Input';
 import { Sheet } from './Sheet';
@@ -51,12 +52,11 @@ export function Select<T extends string | number>({
   const selected = options.find((option) => option.value === value);
 
   const filtered = useMemo(() => {
-    const term = query.trim().toLowerCase();
+    const term = normalizar(query.trim());
     if (!term) return options;
 
     return options.filter(
-      (option) =>
-        option.label.toLowerCase().includes(term) || option.description?.toLowerCase().includes(term)
+      (option) => contemTermo(option.label, term) || contemTermo(option.description, term)
     );
   }, [options, query]);
 

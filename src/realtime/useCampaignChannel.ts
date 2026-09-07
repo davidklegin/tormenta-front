@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSessionStore } from '@/store/session';
 import type {
+  BattleMapState,
   CombatState,
   ConditionsUpdatedEvent,
   MasterDashboard,
@@ -150,6 +151,34 @@ export function useCampaignChannel(campaignId: number | null | undefined, enable
       channel.listen('.combat.updated', (event: CombatState) => {
         markEventReceived();
         queryClient.setQueryData<CombatState>(['combat', campaignId], event);
+      });
+
+      // O tabuleiro virtual: como o palco e a iniciativa, o evento traz o estado
+      // inteiro — com uma ressalva que os outros dois não têm.
+      //
+      // Este mapa sai do servidor em duas versões: a da mesa, por aqui, e a do
+      // mestre, pelo canal pessoal dele (ver useUserChannel). São canais
+      // diferentes, e a ordem entre canais não é garantida. Escrever a visão da
+      // mesa por cima da do mestre apagava da tela dele os tokens escondidos e,
+      // como a tela lê `is_master_view` para saber quem manda, levava junto os
+      // botões de Névoa, Área e Tabuleiro: mover uma peça fazia a barra de
+      // ferramentas do mestre encolher sozinha.
+      //
+      // Aqui a visão da mesa cede a vez. Revalidar em vez de simplesmente
+      // ignorar é o que mantém o mestre em dia mesmo se o evento do canal
+      // pessoal não chegar: o GET devolve a versão certa para quem perguntou.
+      channel.listen('.battlemap.updated', (event: BattleMapState) => {
+        markEventReceived();
+
+        const atual = queryClient.getQueryData<BattleMapState>(['battlemap', campaignId]);
+
+        if (atual?.is_master_view) {
+          void queryClient.invalidateQueries({ queryKey: ['battlemap', campaignId] });
+
+          return;
+        }
+
+        queryClient.setQueryData<BattleMapState>(['battlemap', campaignId], event);
       });
 
       // Anotações e membros mudam com pouca frequência: revalidar é suficiente.

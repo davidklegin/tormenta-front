@@ -7,6 +7,7 @@ import { Button, Card, Chip, Icon, Input, Loading, Sheet, Text } from '@/compone
 import { useReference } from '@/hooks/useReference';
 import { useCombat } from '@/hooks/useCombat';
 import { radius, spacing, useTheme } from '@/theme';
+import { contemTermo, normalizar } from '@/utils/texto';
 
 type TargetGroup = 'players' | 'enemies';
 
@@ -52,8 +53,8 @@ export function CombatBuffPanel({ campaignId }: { campaignId: number }) {
   const conditions = reference.data?.conditions ?? [];
 
   const filteredConditions = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase();
-    return term ? conditions.filter((c) => c.name.toLowerCase().includes(term)) : conditions;
+    const term = normalizar(searchTerm.trim());
+    return term ? conditions.filter((c) => contemTermo(c.name, term)) : conditions;
   }, [conditions, searchTerm]);
 
   const applyBuff = useMutation({
