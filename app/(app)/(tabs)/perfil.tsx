@@ -7,6 +7,7 @@ import { PushNotificationButton } from '@/components/ui/PushNotificationButton';
 import { PageHeader } from '@/components/layout';
 import { closeRealtime } from '@/realtime/useCampaignChannel';
 import { useAuthStore } from '@/store/auth';
+import { useVitalsStore } from '@/store/vitals';
 import { spacing } from '@/theme';
 
 /** Perfil do jogador e configurações da conta (briefing §1). */
@@ -109,6 +110,8 @@ export default function ProfileScreen() {
 
       <PushNotificationButton />
 
+      <VitalsMarkerCard />
+
       <Card title="Seus dados">
         <View style={{ gap: spacing.md }}>
           <Input label="Nome" value={name} onChangeText={setName} />
@@ -189,5 +192,35 @@ export default function ProfileScreen() {
 
       <Button label="Sair da conta" variant="danger" onPress={handleLogout} fullWidth />
     </Screen>
+  );
+}
+
+/**
+ * O interruptor do marcador de vida e mana.
+ *
+ * A pastilha se oculta pelo próprio painel dela — o que a deixaria sem porta de
+ * volta, já que uma vez oculta não há o que tocar na tela. Este é o único lugar
+ * onde ela pode ser chamada de novo, e por isso a explicação vem junto.
+ */
+function VitalsMarkerCard() {
+  const oculto = useVitalsStore((estado) => estado.oculto);
+  const ocultar = useVitalsStore((estado) => estado.ocultar);
+  const mostrar = useVitalsStore((estado) => estado.mostrar);
+
+  return (
+    <Card title="Marcador de vida e mana">
+      <View style={{ gap: spacing.md }}>
+        <Text variant="small" tone="secondary">
+          A pastilha flutuante mostra PV e PM do seu personagem em qualquer tela do app. Toque nela para
+          aplicar dano, cura ou gasto de mana; arraste para escolher onde ela fica.
+        </Text>
+
+        <Button
+          label={oculto ? 'Mostrar marcador' : 'Ocultar marcador'}
+          variant="secondary"
+          onPress={oculto ? mostrar : ocultar}
+        />
+      </View>
+    </Card>
   );
 }

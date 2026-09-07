@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
 import { TurnAlertOverlay } from '@/components/combat';
 import { ShowcaseOverlay } from '@/components/showcase';
+import { VitalsOverlay } from '@/components/vitals';
 import { useAuthStore } from '@/store/auth';
 import { useTheme } from '@/theme';
 
@@ -34,6 +35,12 @@ export default function AppLayout() {
           aqui, e não na tela do combate, que é justamente a que ele não está
           olhando quando a vez chega. */}
       <TurnAlertOverlay />
+
+      {/* Vida e mana à vista em qualquer tela. Mora aqui pelo mesmo motivo do
+          alerta da vez: o jogador precisa do número no grimório e nas
+          anotações, não só na aba Combate — e o painel que a pastilha abre não
+          pode depender de qual rota está montada. */}
+      <VitalsOverlay />
     </View>
   );
 }

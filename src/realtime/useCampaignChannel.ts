@@ -103,8 +103,11 @@ export function useCampaignChannel(campaignId: number | null | undefined, enable
           updated_at: event.updated_at,
         }));
 
-        // A ficha aberta, se houver, também precisa refletir o novo valor.
+        // A ficha aberta, se houver, também precisa refletir o novo valor —
+        // e a lista de fichas junto, que é de onde o marcador flutuante de
+        // vida e mana tira os números em todas as outras telas.
         queryClient.invalidateQueries({ queryKey: ['character', event.character_id], exact: false });
+        queryClient.invalidateQueries({ queryKey: ['characters'] });
       });
 
       channel.listen('.character.conditions.updated', (event: ConditionsUpdatedEvent) => {

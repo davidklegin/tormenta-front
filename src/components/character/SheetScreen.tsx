@@ -10,8 +10,11 @@ import {
   TitlePlate,
 } from '@/components/ui';
 import { useCharacter } from '@/hooks/useCharacters';
+import { useAuthStore } from '@/store/auth';
+import { useVitalsStore } from '@/store/vitals';
 import { SHEET_TABS } from '@/rules';
 import { spacing, useTheme } from '@/theme';
+import { useEffect } from 'react';
 import { usePathname } from 'expo-router';
 import type { Character } from '@/api/types';
 import { CharacterHeader } from './CharacterHeader';
@@ -34,6 +37,19 @@ export function SheetScreen({
   const { colors } = useTheme();
   const query = useCharacter(characterId);
   const pathname = usePathname();
+
+  const meuId = useAuthStore((estado) => estado.user?.id ?? null);
+  const escolherNoMarcador = useVitalsStore((estado) => estado.escolher);
+  const donoDaFicha = query.data?.player?.id ?? null;
+
+  // Abrir a própria ficha passa o marcador flutuante para ela: é a ficha que o
+  // jogador está usando na mesa, e ver os PV de outro personagem na pastilha
+  // enquanto se lê esta seria pior do que não ter pastilha nenhuma.
+  useEffect(() => {
+    if (meuId !== null && donoDaFicha === meuId) {
+      escolherNoMarcador(characterId);
+    }
+  }, [meuId, donoDaFicha, characterId, escolherNoMarcador]);
 
   const segmento = pathname.split('/').pop() ?? 'index';
   const aba = SHEET_TABS.find((tab) => tab.key === segmento) ?? SHEET_TABS[0];

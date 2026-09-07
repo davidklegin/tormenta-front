@@ -16,13 +16,22 @@ export const characterKeys = {
   resources: (id: number) => ['character', id, 'resources'] as const,
 };
 
-/** Tela inicial do jogador (briefing §8) — as fichas dele. */
-export function useCharacters() {
+/**
+ * Tela inicial do jogador (briefing §8) — as fichas dele.
+ *
+ * As opções existem para o marcador flutuante de vida e mana, que assina a
+ * mesma chave de cache: ele confere os números de tempos em tempos e se
+ * desliga quando o jogador o oculta. Como a chave é a mesma da aba
+ * Personagens, as duas leituras compartilham um único resultado.
+ */
+export function useCharacters(options?: { refetchInterval?: number; enabled?: boolean }) {
   return useQuery<CharacterSummary[]>({
     queryKey: characterKeys.all,
     // Fechado numa lambda de propósito: o React Query passa o contexto da
     // query como primeiro argumento, e ele viraria querystring.
     queryFn: () => charactersApi.list(),
+    refetchInterval: options?.refetchInterval,
+    enabled: options?.enabled ?? true,
   });
 }
 
