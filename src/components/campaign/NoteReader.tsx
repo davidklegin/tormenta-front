@@ -39,6 +39,7 @@ export function NoteReader({
           <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
             <Chip label={note.category_label} compact />
             {note.visibility === 'master_only' ? <Chip label="Somente o mestre" compact tone="gold" /> : null}
+            {!note.body_revealed ? <Chip label="Não revelado" compact tone="arcane" /> : null}
           </View>
 
           {/* Os arquivos vêm antes do texto: é o retrato do NPC que faz a
@@ -48,9 +49,18 @@ export function NoteReader({
             <NoteAttachments attachments={note.attachments} editable={false} onChanged={() => undefined} />
           ) : null}
 
-          <Text variant="body" tone="secondary" selectable>
-            {note.body?.trim() ? note.body : 'Esta anotação não tem texto.'}
-          </Text>
+          {/* Velado não é vazio: dizer "não tem texto" mandaria o jogador
+              embora de uma anotação que ainda vai ganhar conteúdo na mesa. */}
+          {note.body_hidden ? (
+            <Text variant="body" tone="muted" style={{ fontStyle: 'italic' }}>
+              O mestre ainda não revelou a descrição. Nome e retrato já são seus; o resto vem quando
+              você conhecer esta pessoa em jogo.
+            </Text>
+          ) : (
+            <Text variant="body" tone="secondary" selectable>
+              {note.body?.trim() ? note.body : 'Esta anotação não tem texto.'}
+            </Text>
+          )}
         </>
       ) : null}
     </Sheet>

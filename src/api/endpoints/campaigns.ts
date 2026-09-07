@@ -82,6 +82,13 @@ export const campaignsApi = {
       body: payload,
     }).then((r) => r.data),
 
+  /** "Já podem ler": libera (ou volta a velar) a descrição. Só o mestre da mesa. */
+  revealNote: (id: number, noteId: number, revealed: boolean) =>
+    apiRequest<Envelope<CampaignNote>>(`/campaigns/${id}/notes/${noteId}/reveal`, {
+      method: 'PATCH',
+      body: { revealed },
+    }).then((r) => r.data),
+
   removeNote: (id: number, noteId: number) =>
     apiRequest<{ message: string }>(`/campaigns/${id}/notes/${noteId}`, { method: 'DELETE' }),
 

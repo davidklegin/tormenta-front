@@ -185,7 +185,14 @@ export function useCampaignNoteMutations(campaignId: number) {
     onSuccess: invalidate,
   });
 
-  return { create, update, remove };
+  /** O mestre libera a descrição de um NPC para a mesa, ou volta a velá-la. */
+  const reveal = useMutation({
+    mutationFn: ({ id, revealed }: { id: number; revealed: boolean }) =>
+      campaignsApi.revealNote(campaignId, id, revealed),
+    onSuccess: invalidate,
+  });
+
+  return { create, update, remove, reveal };
 }
 
 export type { CampaignNote };

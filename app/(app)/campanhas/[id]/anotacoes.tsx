@@ -56,7 +56,7 @@ export default function CampaignNotesScreen() {
     category: category === 'todas' ? undefined : (category as NoteCategory),
   });
 
-  const { remove } = useCampaignNoteMutations(campaignId);
+  const { remove, reveal } = useCampaignNoteMutations(campaignId);
 
   const isMaster = campaign.data?.is_master ?? false;
   // Visitante de mesa pública lê as anotações, mas não escreve nelas nem
@@ -151,6 +151,7 @@ export default function CampaignNotesScreen() {
                 </Text>
                 <Chip label={note.category_label} compact />
                 {note.visibility === 'master_only' ? <Chip label="Mestre" compact tone="gold" /> : null}
+                {!note.body_revealed ? <Chip label="Não revelado" compact tone="arcane" /> : null}
               </View>
 
               {note.attachments && note.attachments.length > 0 ? (
@@ -161,23 +162,51 @@ export default function CampaignNotesScreen() {
                 <Text variant="small" tone="secondary" numberOfLines={3}>
                   {note.body}
                 </Text>
+              ) : note.body_hidden ? (
+                /* O nome e o retrato ficam acima, à vista: o que este aviso
+                   substitui é só o que a mesa ainda não descobriu sobre a
+                   pessoa. */
+                <Text variant="small" tone="muted" style={{ fontStyle: 'italic' }}>
+                  O mestre ainda não revelou a descrição.
+                </Text>
               ) : null}
 
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                 <Text variant="caption" tone="muted">
                   {note.author?.name ?? '—'} · {formatDate(note.updated_at)}
                 </Text>
-                {note.can_edit ? (
-                  <Pressable
-                    onPress={() => remove.mutate(note.id)}
-                    hitSlop={8}
-                    accessibilityLabel="Excluir anotação"
-                  >
-                    <Text variant="small" tone="muted">
-                      excluir
-                    </Text>
-                  </Pressable>
-                ) : null}
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+                  {/* Só aparece onde há texto a liberar — numa anotação sem
+                      corpo o botão não teria o que revelar. */}
+                  {isMaster && (note.body || note.body_hidden) ? (
+                    <Pressable
+                      onPress={() => reveal.mutate({ id: note.id, revealed: !note.body_revealed })}
+                      hitSlop={8}
+                      accessibilityLabel={
+                        note.body_revealed
+                          ? 'Ocultar a descrição da mesa'
+                          : 'Revelar a descrição para a mesa'
+                      }
+                    >
+                      <Text variant="small" tone={note.body_revealed ? 'muted' : 'arcane'}>
+                        {note.body_revealed ? 'ocultar descrição' : 'revelar descrição'}
+                      </Text>
+                    </Pressable>
+                  ) : null}
+
+                  {note.can_edit ? (
+                    <Pressable
+                      onPress={() => remove.mutate(note.id)}
+                      hitSlop={8}
+                      accessibilityLabel="Excluir anotação"
+                    >
+                      <Text variant="small" tone="muted">
+                        excluir
+                      </Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
             </Pressable>
           ))}

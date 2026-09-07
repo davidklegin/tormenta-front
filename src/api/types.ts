@@ -113,6 +113,10 @@ export type CampaignNote = {
   category: NoteCategory;
   category_label: string;
   visibility: 'campaign' | 'master_only';
+  /** O mestre já liberou a descrição para a mesa? Só ele muda isto. */
+  body_revealed: boolean;
+  /** Há descrição, mas este leitor ainda não pode lê-la — `body` vem nulo. */
+  body_hidden: boolean;
   pinned: boolean;
   author?: User;
   can_edit: boolean;
