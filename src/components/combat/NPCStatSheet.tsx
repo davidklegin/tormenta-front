@@ -141,9 +141,9 @@ export function NPCStatSheet({ entry, item, conditions, onClose, onUpdateStats }
           {ca && <Numero rotulo="CA" valor={ca} />}
         </View>
 
-        {entry.conditions.length > 0 && (
+        {(entry.conditions?.length ?? 0) > 0 && (
           <Secao titulo="Condições">
-            <ConditionBadges conditions={entry.conditions} catalog={catalogo} />
+            <ConditionBadges conditions={entry.conditions ?? []} catalog={catalogo} />
           </Secao>
         )}
 

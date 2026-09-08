@@ -82,7 +82,7 @@ export function CombatSidebar({
     [combat.entries, selecionada]
   );
 
-  const ultimoDano = combat.damage_log[0] ?? null;
+  const ultimoDano = combat.damage_log?.[0] ?? null;
 
   if (!combat.active || combat.entries.length === 0) return null;
 
@@ -443,7 +443,11 @@ function LinhaDeCombatente({
 }) {
   const { colors } = useTheme();
 
-  const caido = entry.current_hp <= 0;
+  // Sem PV registrado não é o mesmo que sem PV. Um combate salvo antes de a
+  // ordem guardar vitais chega com 0/0, e riscar esses nomes anunciaria à mesa
+  // que oito personagens caíram — quando o que houve é que ninguém anotou a
+  // vida deles.
+  const caido = entry.max_hp > 0 && entry.current_hp <= 0;
 
   return (
     <Pressable
@@ -482,9 +486,9 @@ function LinhaDeCombatente({
           {entry.name}
         </Text>
 
-        {entry.conditions.length > 0 && (
+        {(entry.conditions?.length ?? 0) > 0 && (
           <ConditionBadges
-            conditions={entry.conditions}
+            conditions={entry.conditions ?? []}
             catalog={catalogo}
             compact
             onRemove={onRemoveCondition}
@@ -558,7 +562,11 @@ function Retrato({ entry, tamanho, caido = false }: { entry: CombatEntry; tamanh
 function Vitais({ entry, compacto }: { entry: CombatEntry; compacto: boolean }) {
   const { colors } = useTheme();
 
-  const proporcao = entry.max_hp > 0 ? entry.current_hp / entry.max_hp : 1;
+  // Nada a mostrar quando a entrada não tem vitais: "0/0" é pior que o silêncio,
+  // porque parece um número e não é.
+  if (entry.max_hp <= 0) return null;
+
+  const proporcao = entry.current_hp / entry.max_hp;
   const corDoPv =
     entry.current_hp <= 0
       ? colors.dangerInk

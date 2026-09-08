@@ -379,8 +379,8 @@ export default function TabuleiroScreen() {
       <View style={{ flex: 1, flexDirection: 'row' }}>
         {ehMestre && mapa?.id && (
           <MasterTokenSidebar
-            tokens={mapa.tokens}
-            areas={mapa.area_effects}
+            tokens={mapa.tokens ?? []}
+            areas={mapa.area_effects ?? []}
             entries={ordem?.entries ?? []}
             conditions={condicoesDoLivro}
             selecionado={selecionado}

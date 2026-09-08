@@ -37,7 +37,7 @@ export function MasterBoardSheet({ visible, onClose, campaignId, battleMap, cont
       <SegmentedControl
         segments={[
           { value: 'mapa', label: 'Mapa' },
-          { value: 'pecas', label: 'Peças', badge: battleMap.tokens.length },
+          { value: 'pecas', label: 'Peças', badge: battleMap.tokens?.length ?? 0 },
         ]}
         value={aba}
         onChange={setAba}

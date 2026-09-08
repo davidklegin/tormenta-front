@@ -89,12 +89,12 @@ function MapTokenBase({
           )}
         </View>
 
-        {token.conditions.length > 0 && (
+        {(token.conditions?.length ?? 0) > 0 && (
           <View
             style={[styles.selo, { backgroundColor: colors.warningFill, borderColor: colors.warning }]}
           >
             <Text variant="caption" style={{ fontSize: 9, color: colors.warningInk }}>
-              {token.conditions.length}
+              {token.conditions?.length ?? 0}
             </Text>
           </View>
         )}

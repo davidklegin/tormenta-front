@@ -383,7 +383,7 @@ function LinhaDaPeca({
 }) {
   const { colors } = useTheme();
 
-  const marcadores = token.conditions
+  const marcadores = (token.conditions ?? [])
     .map((chave) => catalogo.get(chave)?.name ?? chave)
     .join(', ');
 

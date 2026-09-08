@@ -530,7 +530,7 @@ function TabuleiroDaSessao({ campaignId }: { campaignId: number }) {
 
         <Text variant="small" tone={aberto ? 'default' : 'muted'} numberOfLines={2}>
           {aberto
-            ? `${mapa?.name} — ${mapa?.tokens.length ?? 0} peça${(mapa?.tokens.length ?? 0) === 1 ? '' : 's'} no mapa.`
+            ? `${mapa?.name} — ${mapa?.tokens?.length ?? 0} peça${(mapa?.tokens?.length ?? 0) === 1 ? '' : 's'} no mapa.`
             : podeMontar
               ? 'Nenhum mapa na mesa. Monte um para o próximo combate.'
               : 'O mestre ainda não pôs um mapa na mesa.'}
