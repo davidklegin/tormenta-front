@@ -6,24 +6,35 @@ import { VitalsOverlay } from '@/components/vitals';
 import { useAuthStore } from '@/store/auth';
 import { useTheme } from '@/theme';
 
+/**
+ * Altura que a barra de ferramentas do tabuleiro toma do rodapé, com folga para
+ * a segunda linha em que ela quebra nas telas estreitas e para a faixa da peça
+ * selecionada, que abre abaixo dela.
+ */
+const ESPACO_DA_BARRA_DO_TABULEIRO = 168;
+
 /** Área logada. Sem sessão válida, ninguém passa daqui. */
 export default function AppLayout() {
   const { colors } = useTheme();
 
   const status = useAuthStore((state) => state.status);
 
-  // O tabuleiro é a exceção da pastilha. Lá a barra de ferramentas ocupa o
-  // rodapé — e, no celular, ela quebra em três linhas —, e a fila de
-  // iniciativa já mostra PV e PM de quem está na cena. A pastilha, que é
-  // arrastável e nasce justamente naquele canto, só cobria botões.
-  //
-  // As telas viradas para a mesa saem pelo outro motivo: ali é o grupo inteiro
+  // As telas viradas para a mesa não têm pastilha: ali é o grupo inteiro
   // olhando um mapa ou um cartaz, e o PV de quem por acaso está logado naquele
   // aparelho não é assunto de todo mundo — nem serve para nada projetado na
   // parede, onde ele só cobre um pedaço da cena.
+  //
+  // O tabuleiro é diferente, e por isso saiu desta lista: quem está nele é o
+  // jogador movendo a própria peça, e é lá que ele leva o dano. Sem a pastilha,
+  // conferir o PV — ou abrir a ficha — custava sair do mapa e voltar.
+  //
+  // Ele entra com uma condição: o rodapé é ocupado pela barra de ferramentas,
+  // que no celular quebra em mais de uma linha, e a pastilha nasce justamente
+  // naquele canto. A folga abaixo a mantém acima dos botões; dali o jogador
+  // arrasta para onde quiser, e o lugar fica guardado.
   const rota = usePathname();
-  const naTelaDaMesa =
-    rota.endsWith('/tabuleiro') || rota.endsWith('/tabuleiro-tv') || rota.endsWith('/palco');
+  const naTelaDaMesa = rota.endsWith('/tabuleiro-tv') || rota.endsWith('/palco');
+  const noTabuleiro = rota.endsWith('/tabuleiro');
 
   if (status !== 'authenticated') {
     return <Redirect href="/(auth)/login" />;
@@ -53,7 +64,7 @@ export default function AppLayout() {
           alerta da vez: o jogador precisa do número no grimório e nas
           anotações, não só na aba Combate — e o painel que a pastilha abre não
           pode depender de qual rota está montada. */}
-      {!naTelaDaMesa && <VitalsOverlay />}
+      {!naTelaDaMesa && <VitalsOverlay folgaDoRodape={noTabuleiro ? ESPACO_DA_BARRA_DO_TABULEIRO : undefined} />}
     </View>
   );
 }

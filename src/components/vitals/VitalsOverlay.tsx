@@ -28,7 +28,12 @@ import { VitalsSheet } from './VitalsSheet';
  */
 const INTERVALO_DE_CONFERENCIA = 20_000;
 
-export function VitalsOverlay() {
+export function VitalsOverlay({
+  /** Quanto do rodapé está ocupado na tela em que a pastilha aparece. */
+  folgaDoRodape,
+}: {
+  folgaDoRodape?: number;
+} = {}) {
   const hidratado = useVitalsStore((estado) => estado.hidratado);
   const hidratar = useVitalsStore((estado) => estado.hidratar);
   const characterId = useVitalsStore((estado) => estado.characterId);
@@ -70,7 +75,7 @@ export function VitalsOverlay() {
 
   return (
     <>
-      <VitalsPill ficha={escolhida} onPress={() => setAberto(true)} />
+      <VitalsPill ficha={escolhida} folgaDoRodape={folgaDoRodape} onPress={() => setAberto(true)} />
 
       <VitalsSheet
         characterId={escolhida.id}

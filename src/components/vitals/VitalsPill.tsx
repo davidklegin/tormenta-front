@@ -37,7 +37,16 @@ function dentro(posicao: PosicaoDoMarcador, limites: Limites): PosicaoDoMarcador
   };
 }
 
-export function VitalsPill({ ficha, onPress }: { ficha: CharacterSummary; onPress: () => void }) {
+export function VitalsPill({
+  ficha,
+  onPress,
+  folgaDoRodape = ESPACO_DA_BARRA,
+}: {
+  ficha: CharacterSummary;
+  onPress: () => void;
+  /** Rodapé ocupado na tela atual — o tabuleiro tem barra de ferramentas. */
+  folgaDoRodape?: number;
+}) {
   const { colors, elevation } = useTheme();
   const vitais = vitalColors(colors);
 
@@ -54,9 +63,9 @@ export function VitalsPill({ ficha, onPress }: { ficha: CharacterSummary; onPres
       minX: MARGEM,
       maxX: width - tamanho.current.largura - MARGEM,
       minY: insets.top + MARGEM,
-      maxY: height - tamanho.current.altura - insets.bottom - ESPACO_DA_BARRA,
+      maxY: height - tamanho.current.altura - insets.bottom - folgaDoRodape,
     }),
-    [width, height, insets.top, insets.bottom]
+    [width, height, insets.top, insets.bottom, folgaDoRodape]
   );
 
   // O gesto lê os limites por referência: o PanResponder é montado uma vez, e

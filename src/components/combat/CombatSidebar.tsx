@@ -3,6 +3,7 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { Image } from 'expo-image';
 import type { CombatCondition, CombatEntry, CombatState, ReferenceCondition } from '@/api/types';
 import { Icon, Text } from '@/components/ui';
+import { useLembrado } from '@/hooks/useLembrado';
 import { radius, spacing, stroke, useResponsive, useTheme } from '@/theme';
 import { AlcaDeAmpliar, useAmpliacao } from './ampliacao';
 import { ConditionBadges } from './ConditionBadges';
@@ -96,6 +97,16 @@ export function CombatSidebar({
   const ampliacao = useAmpliacao({ largura, guardarComo: 'mapa' });
 
   /*
+    Recolher é diferente de ampliar, e as duas coisas convivem.
+
+    Quem recolhe está com o mapa cheio e quer o canto de volta — mas continua
+    precisando saber de quem é a vez, e o mestre continua passando o turno.
+    Por isso a fila some e o cabeçalho fica: dele para baixo, sobra uma tira do
+    tamanho de uma linha, com a rodada, quem age agora e as setas.
+  */
+  const [recolhida, recolher] = useLembrado('tormenta20.iniciativa.recolhida.mapa', false);
+
+  /*
     A fila encolhe em pontos o quanto a ampliação a estica em pixels. Sem isto,
     dobrar o bloco jogaria metade da ordem para fora da borda de baixo — e a
     fila é justamente o que se foi ampliar para ler.
@@ -119,6 +130,8 @@ export function CombatSidebar({
   );
 
   const ultimoDano = combat.damage_log?.[0] ?? null;
+
+  const agora = combat.entries[combat.turn_index] ?? null;
 
   if (!combat.active || combat.entries.length === 0) return null;
 
@@ -197,10 +210,7 @@ export function CombatSidebar({
             */}
             {onUndoDamage && ultimoDano && (
               <>
-                <BotaoDeBarra
-                  rotulo={`Desfazer o dano em ${ultimoDano.entry_name}`}
-                  onPress={onUndoDamage}
-                >
+                <BotaoDeBarra rotulo={`Desfazer o dano em ${ultimoDano.entry_name}`} onPress={onUndoDamage}>
                   <Glifo texto="⟲" cor={colors.dangerInk} />
                 </BotaoDeBarra>
 
@@ -221,75 +231,113 @@ export function CombatSidebar({
             )}
           </>
         )}
+
+        {/* Recolher é de todo mundo, e não só do mestre: no celular do jogador
+            a coluna cobre um terço do mapa. */}
+        <BotaoDeBarra
+          rotulo={recolhida ? 'Abrir a fila de iniciativa' : 'Recolher a fila de iniciativa'}
+          onPress={() => recolher(!recolhida)}
+        >
+          <Glifo texto={recolhida ? '⌄' : '⌃'} cor={colors.textMuted} />
+        </BotaoDeBarra>
       </View>
 
-      <ScrollView style={{ maxHeight: alturaDaFila }} contentContainerStyle={{ padding: spacing.xs, gap: 2 }}>
-        {linhas.map((linha) => {
-          const bando = linha.membros.length > 1;
-          const aberto = expandidos.has(linha.chave);
+      {/* Recolhida, a coluna vira uma tira: quem está agindo e quanto tirou.
+          É o que a mesa pergunta em voz alta, e o que faria alguém abrir a fila
+          de novo três segundos depois de a ter fechado. */}
+      {recolhida && agora ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.xs,
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.xs,
+            backgroundColor: colors.accentFill,
+          }}
+        >
+          <Text variant="smallStrong" tone="gold" numberOfLines={1} style={{ flex: 1 }}>
+            {agora.name}
+          </Text>
 
-          if (bando && !aberto) {
+          <Text variant="caption" tone="gold">
+            {agora.initiative}
+          </Text>
+        </View>
+      ) : null}
+
+      {!recolhida && (
+        <ScrollView
+          style={{ maxHeight: alturaDaFila }}
+          contentContainerStyle={{ padding: spacing.xs, gap: 2 }}
+        >
+          {linhas.map((linha) => {
+            const bando = linha.membros.length > 1;
+            const aberto = expandidos.has(linha.chave);
+
+            if (bando && !aberto) {
+              return (
+                <LinhaDeBando
+                  key={linha.chave}
+                  linha={linha}
+                  turnIndex={combat.turn_index}
+                  mostrarVitais={linha.membros.some(podeVerVitais)}
+                  onExpandir={() => alternarGrupo(linha.chave)}
+                />
+              );
+            }
+
             return (
-              <LinhaDeBando
-                key={linha.chave}
-                linha={linha}
-                turnIndex={combat.turn_index}
-                mostrarVitais={linha.membros.some(podeVerVitais)}
-                onExpandir={() => alternarGrupo(linha.chave)}
-              />
-            );
-          }
+              <View key={linha.chave} style={bando ? { gap: 2 } : undefined}>
+                {bando && (
+                  <Pressable
+                    onPress={() => alternarGrupo(linha.chave)}
+                    accessibilityRole="button"
+                    style={{ paddingHorizontal: spacing.sm, paddingTop: 2 }}
+                  >
+                    <Text variant="caption" tone="muted">
+                      {nomeDoBando(linha)} · recolher
+                    </Text>
+                  </Pressable>
+                )}
 
-          return (
-            <View key={linha.chave} style={bando ? { gap: 2 } : undefined}>
-              {bando && (
-                <Pressable
-                  onPress={() => alternarGrupo(linha.chave)}
-                  accessibilityRole="button"
-                  style={{ paddingHorizontal: spacing.sm, paddingTop: 2 }}
-                >
-                  <Text variant="caption" tone="muted">
-                    {nomeDoBando(linha)} · recolher
-                  </Text>
-                </Pressable>
-              )}
+                {linha.membros.map((entry) => {
+                  const indice = combat.entries.indexOf(entry);
 
-              {linha.membros.map((entry) => {
-                const indice = combat.entries.indexOf(entry);
+                  return (
+                    <LinhaDeCombatente
+                      key={entry.id}
+                      entry={entry}
+                      ativa={indice === combat.turn_index}
+                      proxima={indice === (combat.turn_index + 1) % combat.entries.length}
+                      selecionada={selecionada === entry.id}
+                      mostrarVitais={podeVerVitais(entry)}
+                      catalogo={catalogo}
+                      compacto={compacto}
+                      onPress={() => {
+                        if (!isMaster) {
+                          onOpenSheet?.(entry);
 
-                return (
-                  <LinhaDeCombatente
-                    key={entry.id}
-                    entry={entry}
-                    ativa={indice === combat.turn_index}
-                    proxima={indice === (combat.turn_index + 1) % combat.entries.length}
-                    selecionada={selecionada === entry.id}
-                    mostrarVitais={podeVerVitais(entry)}
-                    catalogo={catalogo}
-                    compacto={compacto}
-                    onPress={() => {
-                      if (!isMaster) {
-                        onOpenSheet?.(entry);
+                          return;
+                        }
 
-                        return;
+                        setSelecionada((atual) => (atual === entry.id ? null : entry.id));
+                      }}
+                      onRemoveCondition={
+                        isMaster && onRemoveCondition
+                          ? (condition) => onRemoveCondition(entry, condition)
+                          : undefined
                       }
+                    />
+                  );
+                })}
+              </View>
+            );
+          })}
+        </ScrollView>
+      )}
 
-                      setSelecionada((atual) => (atual === entry.id ? null : entry.id));
-                    }}
-                    onRemoveCondition={
-                      isMaster && onRemoveCondition
-                        ? (condition) => onRemoveCondition(entry, condition)
-                        : undefined
-                    }
-                  />
-                );
-              })}
-            </View>
-          );
-        })}
-      </ScrollView>
-
-      {isMaster && entradaSelecionada && (
+      {!recolhida && isMaster && entradaSelecionada && (
         <View
           style={{
             borderTopWidth: stroke.hairline,
@@ -318,10 +366,7 @@ export function CombatSidebar({
               <Glifo texto="↓" cor={colors.textMuted} />
             </BotaoDeBarra>
 
-            <BotaoDeBarra
-              rotulo="Aplicar condição"
-              onPress={() => onOpenConditions?.(entradaSelecionada)}
-            >
+            <BotaoDeBarra rotulo="Aplicar condição" onPress={() => onOpenConditions?.(entradaSelecionada)}>
               <Icon name="condicao" size={15} color={colors.textMuted} />
             </BotaoDeBarra>
 
@@ -399,7 +444,10 @@ function especieDe(entry: CombatEntry): string | null {
 
   if (entry.stage_item_id !== null) return `peca:${entry.stage_item_id}`;
 
-  const base = entry.name.replace(/\s*\d+$/, '').trim().toLowerCase();
+  const base = entry.name
+    .replace(/\s*\d+$/, '')
+    .trim()
+    .toLowerCase();
 
   return base === '' ? null : `nome:${base}`;
 }
@@ -558,7 +606,15 @@ function LinhaDeCombatente({
   );
 }
 
-function Retrato({ entry, tamanho, caido = false }: { entry: CombatEntry; tamanho: number; caido?: boolean }) {
+function Retrato({
+  entry,
+  tamanho,
+  caido = false,
+}: {
+  entry: CombatEntry;
+  tamanho: number;
+  caido?: boolean;
+}) {
   const { colors } = useTheme();
 
   const moldura = {
