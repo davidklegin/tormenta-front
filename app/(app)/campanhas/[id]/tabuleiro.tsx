@@ -24,6 +24,7 @@ import { useReference } from '@/hooks/useReference';
 import { useStageItems } from '@/hooks/useStage';
 import { useCampaignChannel } from '@/realtime/useCampaignChannel';
 import { spacing, useResponsive, useTheme } from '@/theme';
+import { ApiError } from '@/api';
 import type { AreaEffectShape, CombatCondition, CombatEntry } from '@/api/types';
 
 /**
@@ -278,6 +279,42 @@ export default function TabuleiroScreen() {
     return (
       <Screen constrained={false}>
         <Loading label="Abrindo o tabuleiro…" />
+      </Screen>
+    );
+  }
+
+  // O tabuleiro é de quem senta à mesa (CampaignPolicy::viewStage), então quem
+  // ainda não entrou na campanha leva 403 aqui. Isso não é uma falha, e
+  // "Tentar novamente" era a resposta errada: repetir a chamada dá 403 de novo,
+  // e a pessoa fica achando que o aplicativo quebrou quando o que falta é
+  // entrar na mesa — que é um botão em outra tela.
+  if (tabuleiro.error instanceof ApiError && tabuleiro.error.isForbidden) {
+    return (
+      <Screen constrained={false}>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.sm }}>
+          <Icon name="jogadores" size={48} color={colors.textSubtle} />
+          <Text variant="heading" tone="secondary" center>
+            O tabuleiro é de quem está na mesa
+          </Text>
+          <Text variant="small" tone="muted" center>
+            Entre na campanha para acompanhar o mapa durante a sessão.
+          </Text>
+          <Pressable
+            onPress={() => router.replace(`/(app)/campanhas/${campaignId}`)}
+            accessibilityRole="button"
+            style={{
+              marginTop: spacing.sm,
+              paddingHorizontal: spacing.lg,
+              paddingVertical: spacing.sm,
+              borderRadius: 8,
+              backgroundColor: colors.primary,
+            }}
+          >
+            <Text variant="small" style={{ color: colors.onPrimary }}>
+              Ir para a campanha
+            </Text>
+          </Pressable>
+        </View>
       </Screen>
     );
   }
