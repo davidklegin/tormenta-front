@@ -18,6 +18,8 @@ type Props = {
   onFecharSelecao: () => void;
   onAbrirPainel: () => void;
   onRecentralizar: () => void;
+  /** Abre a ficha de quem está jogando. Ausente para quem não tem ficha na mesa. */
+  onAbrirFicha?: () => void;
   /** Forma e alcance que o próximo toque no modo Área vai marcar. */
   area: { forma: AreaEffectShape; raio: number };
   onArea: (area: { forma: AreaEffectShape; raio: number }) => void;
@@ -81,6 +83,7 @@ export function BattleMapToolbar({
   onFecharSelecao,
   onAbrirPainel,
   onRecentralizar,
+  onAbrirFicha,
   area,
   onArea,
 }: Props) {
@@ -204,6 +207,11 @@ export function BattleMapToolbar({
             tabuleiro, e perder o mapa de vista ao arrastar é fácil demais para
             a saída dividir espaço com o resto. */}
         <Acao icone="buscar" rotulo="Centralizar" onPress={onRecentralizar} />
+
+        {/* A ficha de quem está jogando, sem sair do mapa. Fica ao lado do
+            painel do mestre porque é o equivalente do jogador: o botão que
+            abre o que é dele, e não uma ferramenta de desenhar no tabuleiro. */}
+        {onAbrirFicha && <Acao icone="personagens" rotulo="Ficha" onPress={onAbrirFicha} />}
 
         {ehMestre && <Acao icone="configuracoes" rotulo="Tabuleiro" onPress={onAbrirPainel} />}
       </View>

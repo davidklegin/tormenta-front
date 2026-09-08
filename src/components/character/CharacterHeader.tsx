@@ -91,20 +91,33 @@ export function CharacterHeader({ character }: { character: Character }) {
         ))}
       </View>
 
-      {/* Faixa de valores consultados o tempo todo */}
-      <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
-        <StatTile label="Defesa" value={character.defense.total} highlight />
-        <StatTile label="Deslocamento" value={`${character.displacement.effective}m`} />
-        {character.spellcasting.total !== null ? (
-          <StatTile label="CD de magia" value={character.spellcasting.total} />
-        ) : null}
-        {character.damage_reduction.total > 0 ? (
-          <StatTile label="RD" value={character.damage_reduction.total} />
-        ) : null}
-        {character.armor_penalty !== 0 ? (
-          <StatTile label="Penal. armadura" value={character.armor_penalty} tone="warning" />
-        ) : null}
-      </View>
+      <CharacterStats character={character} />
+    </View>
+  );
+}
+
+/**
+ * A faixa de números consultados o tempo todo: Defesa, deslocamento, CD de
+ * magia e o que mais estiver valendo.
+ *
+ * Separada do cabeçalho porque ela vale sozinha — é o que o tabuleiro mostra no
+ * modal da ficha, onde nome, avatar e o botão de editar seriam repetição do
+ * título do painel e um convite a sair do mapa no meio da luta.
+ */
+export function CharacterStats({ character }: { character: Character }) {
+  return (
+    <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
+      <StatTile label="Defesa" value={character.defense.total} highlight />
+      <StatTile label="Deslocamento" value={`${character.displacement.effective}m`} />
+      {character.spellcasting.total !== null ? (
+        <StatTile label="CD de magia" value={character.spellcasting.total} />
+      ) : null}
+      {character.damage_reduction.total > 0 ? (
+        <StatTile label="RD" value={character.damage_reduction.total} />
+      ) : null}
+      {character.armor_penalty !== 0 ? (
+        <StatTile label="Penal. armadura" value={character.armor_penalty} tone="warning" />
+      ) : null}
     </View>
   );
 }

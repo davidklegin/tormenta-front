@@ -11,6 +11,7 @@ import {
   nomeDaCelula,
   type ModoDoTabuleiro,
 } from '@/components/battlemap';
+import { CharacterSheetModal } from '@/components/character/CharacterSheetModal';
 import {
   acharEntradaDoToken,
   CombatSidebar,
@@ -94,10 +95,22 @@ export default function TabuleiroScreen() {
   // ofereceria controles que a API devolveria 403.
   const ehMestre = mapa?.is_master_view ?? false;
 
-  const minhasFichas = useMemo(
-    () => fichasDaMesa.data?.filter((f) => f.is_owner).map((f) => f.id) ?? [],
+  const minhas = useMemo(
+    () => fichasDaMesa.data?.filter((f) => f.is_owner) ?? [],
     [fichasDaMesa.data]
   );
+
+  const minhasFichas = useMemo(() => minhas.map((f) => f.id), [minhas]);
+
+  /*
+    A ficha do jogador, aberta por cima do mapa.
+
+    No tabuleiro é onde ele passa a luta inteira, e cada resposta que o turno
+    dele exige — Defesa, bônus de ataque, mana que sobrou — estava atrás de uma
+    navegação que descarrega o mapa e o devolve recentrado. O painel abre pelo
+    botão da barra e por um toque na própria linha da fila de iniciativa.
+  */
+  const [fichaAberta, setFichaAberta] = useState<number | null>(null);
 
   // O catálogo de condições é a fonte dos nomes dos marcadores. Vem para todos:
   // o jogador também vê que o goblin está caído.
@@ -475,7 +488,19 @@ export default function TabuleiroScreen() {
                 onReorder={(ids) => combatControls.reordenar.mutate(ids)}
                 onOpenConditions={(entry) => setCondicoesDe(entry.id)}
                 onRemoveCondition={aoRemoverCondicao}
-                onOpenSheet={(entry) => setFichaDe(entry.id)}
+                onOpenSheet={(entry) => {
+                  /* A linha de uma ficha desta pessoa abre a ficha dela; as
+                     outras seguem para a ficha da criatura, que é do mestre.
+                     Antes, tocar na própria linha não fazia nada — o toque já
+                     chegava aqui e morria na condição de mestre lá embaixo. */
+                  if (entry.character_id !== null && minhasFichas.includes(entry.character_id)) {
+                    setFichaAberta(entry.character_id);
+
+                    return;
+                  }
+
+                  setFichaDe(entry.id);
+                }}
               />
             </View>
           )}
@@ -580,6 +605,23 @@ export default function TabuleiroScreen() {
           area={area}
           onArea={setArea}
           onAbrirPainel={() => setPainelAberto(true)}
+          onAbrirFicha={
+            minhas.length > 0
+              ? () => setFichaAberta((atual) => atual ?? minhas[0]?.id ?? null)
+              : undefined
+          }
+        />
+      )}
+
+      {/* A ficha de quem está jogando. Fora do mapa na árvore, como os outros
+          painéis: ela cobre a tela, e nada dentro do tabuleiro depende dela. */}
+      {fichaAberta !== null && (
+        <CharacterSheetModal
+          visible
+          characterId={fichaAberta}
+          fichas={minhas.map((ficha) => ({ id: ficha.id, name: ficha.name }))}
+          onTrocarFicha={setFichaAberta}
+          onClose={() => setFichaAberta(null)}
         />
       )}
 
