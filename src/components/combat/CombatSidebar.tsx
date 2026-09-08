@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { PanResponder, Pressable, ScrollView, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 import { Image } from 'expo-image';
 import type { CombatCondition, CombatEntry, CombatState, ReferenceCondition } from '@/api/types';
 import { Icon, Text } from '@/components/ui';
 import { radius, spacing, stroke, useResponsive, useTheme } from '@/theme';
+import { AlcaDeAmpliar, useAmpliacao } from './ampliacao';
 import { ConditionBadges } from './ConditionBadges';
 import { DamagePopover } from './DamagePopover';
 
@@ -54,15 +55,6 @@ const MOLDURA = 96;
 /** O que fica acima e abaixo do bloco na tela do tabuleiro. */
 const FOLGA_DA_TELA = 140;
 
-/** Teto da ampliação. Acima disto o bloco vira a tela inteira. */
-const ESCALA_MAXIMA = 2.4;
-
-/** Onde o toque simples na alça leva, sem precisar mirar o arrasto. */
-const ESCALA_DE_UM_TOQUE = 1.6;
-
-/** Acima disto o bloco conta como ampliado (folga para o arredondamento). */
-const AMPLIADO = 1.02;
-
 /**
  * A fila de iniciativa com os vitais, do lado do tabuleiro.
  *
@@ -92,25 +84,16 @@ export function CombatSidebar({
 }: Props) {
   const { colors, elevation } = useTheme();
 
-  const { width: janelaLargura, height: janelaAltura } = useResponsive();
+  const { height: janelaAltura } = useResponsive();
 
   const [selecionada, setSelecionada] = useState<string | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
 
-  /*
-    A ampliação é um fator de escala sobre o bloco inteiro, e não uma largura
-    maior: o que a mesa reclama é do tamanho da letra e do retrato — esticar só
-    a caixa daria os mesmos 11px de nome no meio de espaço vazio.
-  */
-  const [escala, setEscala] = useState(1);
-
   const largura = compacto ? LARGURA_COMPACTA : LARGURA;
 
-  /* Teto: ampliado, o bloco ainda tem que caber na largura da janela. */
-  const escalaMaxima = Math.max(
-    1,
-    Math.min(ESCALA_MAXIMA, (janelaLargura - spacing.xl) / largura)
-  );
+  /* Guardado: o mestre escolhe o tamanho uma vez e a coluna volta assim na
+     próxima vez que o combate abrir. */
+  const ampliacao = useAmpliacao({ largura, guardarComo: 'mapa' });
 
   /*
     A fila encolhe em pontos o quanto a ampliação a estica em pixels. Sem isto,
@@ -119,119 +102,8 @@ export function CombatSidebar({
   */
   const alturaDaFila = Math.max(
     ALTURA_MINIMA_DA_FILA,
-    Math.min(ALTURA_DA_FILA, (janelaAltura - FOLGA_DA_TELA) / escala - MOLDURA)
+    Math.min(ALTURA_DA_FILA, (janelaAltura - FOLGA_DA_TELA) / ampliacao.escala - MOLDURA)
   );
-
-  /*
-    Janela menor — o mestre girou o tablet, ou encolheu a janela do navegador —
-    traz o bloco de volta para dentro dela. Sem isto a ampliação escolhida no
-    desktop deixa a alça fora da tela no celular, e não há como desfazê-la.
-  */
-  useEffect(() => {
-    setEscala((atual) => Math.min(atual, escalaMaxima));
-  }, [escalaMaxima]);
-
-  /*
-    O gesto é montado uma vez e lê tudo por referência: remontá-lo a cada
-    render mataria o arrasto em andamento, e a fila re-renderiza sozinha a cada
-    turno e a cada dano que chega pelo tempo real.
-  */
-  const medidas = useRef({ largura, altura: 0, escala, maxima: escalaMaxima });
-  medidas.current.largura = largura;
-  medidas.current.escala = escala;
-  medidas.current.maxima = escalaMaxima;
-
-  const escalaAoPegar = useRef(1);
-
-  /* Distingue o arrasto do toque: os dois começam igual, no mesmo dedo. */
-  const arrastou = useRef(false);
-
-  /*
-    Quando a mão soltou o ponteiro. O navegador ainda emite um clique depois do
-    arrasto, e sem esta marca terminar de puxar desfaria a ampliação que se
-    acabou de escolher — o toque do teclado e o do leitor de tela chegam por
-    esse mesmo clique, e continuam passando porque não vêm depois de um gesto.
-  */
-  const fimDoGesto = useRef(0);
-
-  const puxador = useRef(
-    PanResponder.create({
-      /*
-        A alça toma o gesto no primeiro contato e pela descida (`Capture`) — as
-        duas coisas contra o costume, e as duas necessárias.
-
-        No costume, quem quer arrastar espera alguns pixels de movimento para
-        não roubar o toque de ninguém. Aqui isso não funcionava: o botão de
-        dentro vira o responder no contato (ele é consultado antes, por estar
-        mais fundo), e a partir daí a negociação por movimento só ouve quem
-        está debaixo do ponteiro. A alça tem 28×22, e um puxão de verdade já
-        sai dela no primeiro passo — o gesto nunca chegava a começar, sem erro
-        nenhum: a escala apenas não saía do lugar.
-
-        O preço é que o botão de dentro não vê mais o toque do dedo nem o do
-        mouse; quem decide entre puxar e tocar é o `onPanResponderRelease` aqui
-        embaixo, e o botão fica sendo o caminho do teclado e do leitor de tela.
-      */
-      onStartShouldSetPanResponderCapture: () => true,
-
-      onPanResponderGrant: () => {
-        escalaAoPegar.current = medidas.current.escala;
-        arrastou.current = false;
-      },
-
-      onPanResponderMove: (_evento, gesto) => {
-        if (Math.abs(gesto.dx) > 3 || Math.abs(gesto.dy) > 3) arrastou.current = true;
-
-        if (!arrastou.current) return;
-
-        const { largura: l, altura: a } = medidas.current;
-        const diagonal = l * l + a * a;
-
-        if (diagonal === 0) return;
-
-        /*
-          O bloco cresce a partir do canto de cima à direita, então a alça mora
-          em `escala × (−largura, altura)`. Projetar o dedo nesse vetor é o que
-          faz o canto acompanhar a mão em vez de correr na frente dela.
-        */
-        const avanco = (gesto.dx * -l + gesto.dy * a) / diagonal;
-        const alvo = escalaAoPegar.current + avanco;
-
-        setEscala(Math.round(Math.min(Math.max(alvo, 1), medidas.current.maxima) * 100) / 100);
-      },
-
-      onPanResponderRelease: () => {
-        fimDoGesto.current = Date.now();
-
-        if (!arrastou.current) alternar.current();
-      },
-
-      onPanResponderTerminate: () => {
-        fimDoGesto.current = Date.now();
-      },
-    })
-  ).current;
-
-  /*
-    Alternar entre o tamanho de sempre e o ampliado, lido por referência: o
-    gesto é montado uma vez, e esta função muda a cada render junto com o teto
-    que ela consulta.
-  */
-  const alternar = useRef<() => void>(() => {});
-
-  alternar.current = () => {
-    setEscala((atual) => (atual > AMPLIADO ? 1 : Math.min(ESCALA_DE_UM_TOQUE, escalaMaxima)));
-  };
-
-  /* O caminho do teclado e do leitor de tela, que chegam por clique e não por
-     gesto — e só por ali, porque o gesto já resolveu o toque do ponteiro. */
-  const tocarPeloBotao = () => {
-    if (Date.now() - fimDoGesto.current < 300) return;
-
-    alternar.current();
-  };
-
-  const ampliado = escala > AMPLIADO;
 
   const catalogo = useMemo(() => {
     const mapa = new Map<string, ReferenceCondition>();
@@ -280,18 +152,16 @@ export function CombatSidebar({
 
   return (
     <View
-      onLayout={(evento) => {
-        medidas.current.altura = evento.nativeEvent.layout.height;
-      }}
+      onLayout={ampliacao.aoMedir}
       style={{
         width: largura,
         backgroundColor: colors.surface,
         borderRadius: radius.lg,
         borderWidth: stroke.seal,
-        borderColor: ampliado ? colors.accent : colors.border,
+        borderColor: ampliacao.ampliado ? colors.accent : colors.border,
         overflow: 'hidden',
         ...elevation.floating,
-        transform: [{ scale: escala }],
+        transform: [{ scale: ampliacao.escala }],
         /* O bloco está encostado no canto de cima à direita do mapa: crescer
            por ali é crescer para dentro da tela, e não para fora dela. */
         transformOrigin: 'right top',
@@ -480,60 +350,7 @@ export function CombatSidebar({
         </View>
       )}
 
-      {/*
-        A alça de ampliar, embaixo à esquerda.
-
-        Fica nesse canto porque é o único do bloco que não encosta em nada: o
-        de cima à direita está preso na borda do mapa, e é dele que a ampliação
-        cresce. Puxar daqui para a esquerda e para baixo é o gesto que a mão já
-        espera de um canto solto.
-
-        Ela mora numa faixa própria em vez de flutuar sobre a fila: por cima,
-        cobriria o último nome da ordem — que é justamente quem acabou de
-        entrar em cena quando a lista está cheia.
-      */}
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          borderTopWidth: stroke.hairline,
-          borderTopColor: colors.border,
-          backgroundColor: colors.surfaceAlt,
-          paddingRight: spacing.sm,
-        }}
-      >
-        <View {...puxador.panHandlers}>
-          <Pressable
-            onPress={tocarPeloBotao}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel={
-              ampliado ? 'Voltar a iniciativa ao tamanho normal' : 'Ampliar a iniciativa'
-            }
-            accessibilityHint="Arraste este canto para escolher o tamanho"
-            style={{
-              width: 28,
-              height: 22,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon
-              name={ampliado ? 'sairDaTelaCheia' : 'telaCheia'}
-              size={14}
-              color={ampliado ? colors.accent : colors.textMuted}
-            />
-          </Pressable>
-        </View>
-
-        <View style={{ flex: 1 }} />
-
-        {/* O tamanho escolhido, dito em voz baixa: sem ele, quem puxou até o
-            teto fica tentando puxar mais e achando que travou. */}
-        <Text variant="caption" tone={ampliado ? 'gold' : 'muted'}>
-          {ampliado ? `${Math.round(escala * 100)}%` : 'puxe para ampliar'}
-        </Text>
-      </View>
+      <AlcaDeAmpliar ampliacao={ampliacao} />
     </View>
   );
 }

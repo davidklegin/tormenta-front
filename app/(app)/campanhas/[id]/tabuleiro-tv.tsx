@@ -107,7 +107,13 @@ export default function TabuleiroTvScreen() {
 
       {/* A ordem de iniciativa por cima, no canto — como no palco. Durante o
           combate é o que a mesa mais consulta, e ela não pode depender de
-          alguém rolar a tela da TV. */}
+          alguém rolar a tela da TV.
+
+          Aqui ela é a única coisa da tela em que se mexe, e por um motivo: a
+          distância até a TV é a da sala, não a de um braço. Quem passa perto do
+          aparelho puxa o quadro pelo canto até dar para ler do sofá, e o
+          tamanho fica guardado para as próximas noites. `box-none` deixa o
+          resto do toque seguir para o fundo, que é quem revela a barra. */}
       {combate.data?.active ? (
         <View
           style={{
@@ -116,9 +122,14 @@ export default function TabuleiroTvScreen() {
             right: spacing.lg,
             zIndex: 50,
           }}
-          pointerEvents="none"
+          pointerEvents="box-none"
         >
-          <InitiativeTracker combat={combate.data} compacto={isPhone} />
+          <InitiativeTracker
+            combat={combate.data}
+            compacto={isPhone}
+            ampliavel
+            dica={barraVisivel}
+          />
         </View>
       ) : null}
 
