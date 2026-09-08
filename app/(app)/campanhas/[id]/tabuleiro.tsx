@@ -8,13 +8,13 @@ import {
   BattleMapToolbar,
   MasterBoardSheet,
   MasterTokenSidebar,
+  nomeDaCelula,
   type ModoDoTabuleiro,
 } from '@/components/battlemap';
 import {
   acharEntradaDoToken,
   CombatSidebar,
   ConditionPicker,
-  DamagePopover,
   NPCStatSheet,
 } from '@/components/combat';
 import { useCampaignCharacters } from '@/hooks/useCampaigns';
@@ -150,11 +150,6 @@ export default function TabuleiroScreen() {
     [mover]
   );
 
-  const aoAplicarDano = useCallback(
-    (entryId: string, amount: number) => combatControls.aplicarDano.mutate({ entry_id: entryId, amount }),
-    [combatControls.aplicarDano]
-  );
-
   const aoAtualizarStats = useCallback(
     (entryId: string, stats: { current_hp?: number; max_hp?: number }) =>
       combatControls.atualizarStats.mutate({ entry_id: entryId, ...stats }),
@@ -226,13 +221,15 @@ export default function TabuleiroScreen() {
    * está com uma das mãos nos dados. As ações vão por `ref` porque as mutations
    * do React Query trocam de identidade a cada render — nas dependências, o
    * listener seria removido e recriado sem parar.
+   *
+   * Não há atalho de desfazer dano porque não há dano aqui: o tabuleiro é
+   * posicional, e a vida se resolve na ficha e no painel de combate.
    */
-  const atalhos = useRef({ proximo: aoProximoTurno, anterior: () => {}, desfazer: () => {} });
+  const atalhos = useRef({ proximo: aoProximoTurno, anterior: () => {} });
 
   atalhos.current = {
     proximo: aoProximoTurno,
     anterior: () => combatControls.anterior.mutate(),
-    desfazer: () => combatControls.desfazerDano.mutate(),
   };
 
   const combateAtivo = combate.data?.active ?? false;
@@ -245,13 +242,6 @@ export default function TabuleiroScreen() {
       const alvo = evento.target as HTMLElement | null;
 
       if (alvo?.tagName === 'INPUT' || alvo?.tagName === 'TEXTAREA' || alvo?.isContentEditable) {
-        return;
-      }
-
-      if ((evento.key === 'z' || evento.key === 'Z') && (evento.ctrlKey || evento.metaKey)) {
-        evento.preventDefault();
-        atalhos.current.desfazer();
-
         return;
       }
 
@@ -360,6 +350,29 @@ export default function TabuleiroScreen() {
           {mapa?.name ?? 'Tabuleiro'}
         </Text>
 
+        {/*
+          A exibição para a TV.
+
+          É a mesma sala vista do outro lado: o aparelho ligado na tela grande
+          abre esta rota e fica ali a noite inteira, sem barra de ferramentas e
+          sem o que o mestre escondeu — o corte de quem vê o quê é feito no
+          servidor, e não aqui.
+        */}
+        {mapa?.id ? (
+          <Pressable
+            onPress={() => router.push(`/(app)/campanhas/${campaignId}/tabuleiro-tv`)}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel="Exibir o tabuleiro na TV"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xxs }}
+          >
+            <Icon name="telaCheia" size={16} color={colors.textMuted} />
+            <Text variant="caption" tone="muted">
+              TV
+            </Text>
+          </Pressable>
+        ) : null}
+
         {mapa?.state === 'active' && <Chip label="Em combate" tone="danger" compact />}
         {mapa?.state === 'preparing' && <Chip label="Preparando" tone="warning" compact />}
         {mapa?.state === 'paused' && <Chip label="Pausado" tone="neutral" compact />}
@@ -382,6 +395,7 @@ export default function TabuleiroScreen() {
             tokens={mapa.tokens ?? []}
             areas={mapa.area_effects ?? []}
             entries={ordem?.entries ?? []}
+            fichas={fichasDaMesa.data ?? []}
             conditions={condicoesDoLivro}
             selecionado={selecionado}
             aberta={pecasAbertas}
@@ -407,7 +421,6 @@ export default function TabuleiroScreen() {
             onRemoverArea={(efeitoId) => controles.removerArea.mutate(efeitoId)}
             onAbrirCondicoes={(entry) => setCondicoesDe(entry.id)}
             onAbrirFicha={(entry) => setFichaDe(entry.id)}
-            onAplicarDano={aoAplicarDano}
           />
         )}
 
@@ -459,8 +472,6 @@ export default function TabuleiroScreen() {
                 minhasFichas={minhasFichas}
                 onNextTurn={aoProximoTurno}
                 onPreviousTurn={() => combatControls.anterior.mutate()}
-                onApplyDamage={aoAplicarDano}
-                onUndoDamage={() => combatControls.desfazerDano.mutate()}
                 onReorder={(ids) => combatControls.reordenar.mutate(ids)}
                 onOpenConditions={(entry) => setCondicoesDe(entry.id)}
                 onRemoveCondition={aoRemoverCondicao}
@@ -509,8 +520,17 @@ export default function TabuleiroScreen() {
               {entradaDoToken.name}
             </Text>
 
+            {tokenSelecionado && (
+              <Text variant="caption" tone="muted">
+                {nomeDaCelula(tokenSelecionado.position)}
+              </Text>
+            )}
+
             <Text variant="caption" tone="muted">
               {entradaDoToken.current_hp}/{entradaDoToken.max_hp} PV
+              {entradaDoToken.max_mp
+                ? ` · ${entradaDoToken.current_mp ?? 0}/${entradaDoToken.max_mp} PM`
+                : ''}
             </Text>
 
             <Pressable
@@ -522,12 +542,6 @@ export default function TabuleiroScreen() {
               <Icon name="condicao" size={16} color={colors.textMuted} />
             </Pressable>
           </View>
-
-          <DamagePopover
-            alvo={entradaDoToken.name}
-            onSubmit={(valor) => aoAplicarDano(entradaDoToken.id, valor)}
-            onClose={() => setSelecionado(null)}
-          />
         </View>
       )}
 

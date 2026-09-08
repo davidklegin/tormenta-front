@@ -218,3 +218,36 @@ export function retanguloComoPoligono(a: Celula, b: Celula): FogRegion {
     ],
   };
 }
+
+/**
+ * O nome de uma coluna: A, B, … Z, AA, AB.
+ *
+ * As letras existem para a mesa poder falar do tabuleiro em voz alta — "o
+ * goblin está em C7", "joga a bola de fogo em F4" — sem ninguém precisar
+ * contar quadrados com o dedo na tela. É a mesma numeração de uma planilha, e
+ * por isso a segunda volta do alfabeto continua com duas letras em vez de
+ * recomeçar em A.
+ */
+export function nomeDaColuna(x: number): string {
+  if (x < 0) return '';
+
+  let resto = x;
+  let nome = '';
+
+  do {
+    nome = String.fromCharCode(65 + (resto % 26)) + nome;
+    resto = Math.floor(resto / 26) - 1;
+  } while (resto >= 0);
+
+  return nome;
+}
+
+/** O nome de uma linha: 1, 2, 3 — contando de um, como a mesa conta. */
+export function nomeDaLinha(y: number): string {
+  return String(y + 1);
+}
+
+/** O nome de um quadrado, como a mesa o diz: "C7". */
+export function nomeDaCelula(celula: Celula): string {
+  return `${nomeDaColuna(celula.x)}${nomeDaLinha(celula.y)}`;
+}

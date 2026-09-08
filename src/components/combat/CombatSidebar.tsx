@@ -16,6 +16,7 @@ type Props = {
   minhasFichas?: number[];
   onNextTurn?: () => void;
   onPreviousTurn?: () => void;
+  /** Ausente onde não se aplica dano — o tabuleiro. Sem ela, a caixa some. */
   onApplyDamage?: (entryId: string, amount: number) => void;
   onUndoDamage?: () => void;
   onReorder?: (entryIds: string[]) => void;
@@ -293,11 +294,21 @@ export function CombatSidebar({
             )}
           </View>
 
-          <DamagePopover
-            alvo={entradaSelecionada.name}
-            onSubmit={(valor) => onApplyDamage?.(entradaSelecionada.id, valor)}
-            onClose={() => setSelecionada(null)}
-          />
+          {/*
+            A caixa de dano só aparece onde há para onde mandá-la.
+
+            No tabuleiro ela não existe: lá o combate é posicional, e o dano é
+            resolvido em voz alta na mesa. Desenhá-la assim mesmo daria ao
+            mestre um campo que aceita o número e não faz nada — pior do que
+            não ter campo nenhum.
+          */}
+          {onApplyDamage && (
+            <DamagePopover
+              alvo={entradaSelecionada.name}
+              onSubmit={(valor) => onApplyDamage(entradaSelecionada.id, valor)}
+              onClose={() => setSelecionada(null)}
+            />
+          )}
         </View>
       )}
     </View>

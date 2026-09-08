@@ -3,6 +3,7 @@ import { Icon, Text, type IconName } from '@/components/ui';
 import { radius, spacing, useTheme } from '@/theme';
 import type { AreaEffectShape, BattleMapToken } from '@/api/types';
 import type { ModoDoTabuleiro } from './BattleMapCanvas';
+import { nomeDaCelula } from './geometry';
 
 type Props = {
   modo: ModoDoTabuleiro;
@@ -136,6 +137,12 @@ export function BattleMapToolbar({
           <View style={styles.cabecalhoDaPeca}>
             <Text variant="small" numberOfLines={1} style={{ flex: 1 }}>
               {tokenSelecionado.name}
+            </Text>
+
+            {/* O quadrado, pelo nome que a grade mostra: é assim que a mesa
+                repete a posição em voz alta sem apontar para a tela. */}
+            <Text variant="caption" tone="gold">
+              {nomeDaCelula(tokenSelecionado.position)}
             </Text>
             {/* A dica só para quem comanda a peça: dizer "toque no mapa para
                 mover" ao jogador que selecionou o dragão do mestre é um convite

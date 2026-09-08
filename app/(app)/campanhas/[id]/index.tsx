@@ -542,6 +542,17 @@ function TabuleiroDaSessao({ campaignId }: { campaignId: number }) {
           onPress={() => router.push(`/(app)/campanhas/${campaignId}/tabuleiro`)}
           fullWidth
         />
+
+        {/* A exibição para a TV só aparece com um mapa na mesa: numa tela
+            vazia ela não teria o que mostrar. */}
+        {aberto ? (
+          <Button
+            label="Exibir na TV"
+            variant="ghost"
+            onPress={() => router.push(`/(app)/campanhas/${campaignId}/tabuleiro-tv`)}
+            fullWidth
+          />
+        ) : null}
       </View>
     </Card>
   );

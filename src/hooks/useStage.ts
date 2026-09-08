@@ -108,6 +108,18 @@ export function useStageControls(campaignId: number) {
     onSuccess: aplicar,
   });
 
+  /**
+   * Ampliar a imagem que está no ar, para a mesa toda.
+   *
+   * O estado volta inteiro do servidor, como em `show` e `clear`: a tela do
+   * mestre e a do palco leem o mesmo campo, e não há versão local para
+   * divergir da que está na TV.
+   */
+  const telaCheia = useMutation({
+    mutationFn: (ligada: boolean) => stageApi.fullscreen(campaignId, ligada),
+    onSuccess: aplicar,
+  });
+
   const publishLive = useMutation({
     mutationFn: () => stageApi.publishLive(campaignId),
     onSuccess: () => {
@@ -116,5 +128,5 @@ export function useStageControls(campaignId: number) {
     },
   });
 
-  return { show, clear, publishLive };
+  return { show, clear, telaCheia, publishLive };
 }

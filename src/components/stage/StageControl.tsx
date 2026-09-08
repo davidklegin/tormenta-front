@@ -81,7 +81,7 @@ export function StageControl({ campaignId }: { campaignId: number }) {
   const { isDesktop, height } = useResponsive();
 
   const stage = useStage(campaignId);
-  const { show, clear, publishLive } = useStageControls(campaignId);
+  const { show, clear, telaCheia, publishLive } = useStageControls(campaignId);
 
   const [fonte, setFonte] = useState<Fonte>('acervo');
   const [aviso, setAviso] = useState<string | null>(null);
@@ -99,6 +99,7 @@ export function StageControl({ campaignId }: { campaignId: number }) {
 
   const exibir = (source: StageSource) => show.mutate(source);
   const noAr = stage.data?.poster ?? null;
+  const ampliada = stage.data?.image_fullscreen ?? false;
 
   /**
    * Qual linha está esperando o servidor.
@@ -197,6 +198,33 @@ export function StageControl({ campaignId }: { campaignId: number }) {
                 style={{ flex: 1, minWidth: 130 }}
               />
             </View>
+
+            {/*
+              A imagem ocupando a tela inteira do palco.
+
+              É para o mapa da masmorra e a planta da cripta: com o título, a
+              ficha de dados e o texto em volta, a imagem fica com metade da TV
+              — e é justamente nela que alguém vai apontar "estou aqui". O
+              botão só aparece quando há imagem no ar, porque num texto de
+              leitura em voz alta não há o que ampliar.
+            */}
+            {noAr?.image_url ? (
+              <Button
+                label={ampliada ? 'Voltar ao cartaz' : 'Imagem em tela cheia'}
+                variant={ampliada ? 'primary' : 'secondary'}
+                size="sm"
+                icon={
+                  <Icon
+                    name={ampliada ? 'sairDaTelaCheia' : 'telaCheia'}
+                    size={16}
+                    color={ampliada ? colors.onPrimary : colors.textMuted}
+                  />
+                }
+                loading={telaCheia.isPending}
+                onPress={() => telaCheia.mutate(!ampliada)}
+                fullWidth
+              />
+            ) : null}
 
             {!isDesktop && noAr && previaAberta ? (
               <Button

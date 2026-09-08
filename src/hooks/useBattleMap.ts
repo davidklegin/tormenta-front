@@ -11,6 +11,14 @@ import { useSessionStore } from '@/store/session';
 
 export const battleMapKeys = {
   state: (campaignId: number) => ['battlemap', campaignId] as const,
+  /**
+   * O mesmo tabuleiro, pedido com a visão da mesa.
+   *
+   * Chave separada de propósito: a tela de TV e a tela do mestre podem estar
+   * abertas no mesmo aparelho, e uma escrevendo na chave da outra apagaria da
+   * tela do mestre justamente o que ele escondeu da mesa.
+   */
+  mesa: (campaignId: number) => ['battlemap', campaignId, 'mesa'] as const,
 };
 
 /**
@@ -27,6 +35,25 @@ export function useBattleMap(campaignId: number | null | undefined, enabled = tr
   return useQuery<BattleMapState>({
     queryKey: battleMapKeys.state(campaignId ?? 0),
     queryFn: () => battleMapApi.state(campaignId as number),
+    enabled: Boolean(campaignId) && enabled,
+    refetchInterval: realtimeStatus === 'connected' ? false : 10_000,
+  });
+}
+
+/**
+ * O tabuleiro como a mesa o vê — a tela de TV.
+ *
+ * Pede ao servidor a visão dos jogadores mesmo quando quem está logado é o
+ * mestre: o aparelho fica virado para a mesa, e o payload do mestre poria a
+ * emboscada na tela grande. O canal da campanha traz exatamente essa versão,
+ * então o evento cai direto nesta chave (ver useCampaignChannel).
+ */
+export function useBattleMapDaMesa(campaignId: number | null | undefined, enabled = true) {
+  const realtimeStatus = useSessionStore((state) => state.realtimeStatus);
+
+  return useQuery<BattleMapState>({
+    queryKey: battleMapKeys.mesa(campaignId ?? 0),
+    queryFn: () => battleMapApi.state(campaignId as number, true),
     enabled: Boolean(campaignId) && enabled,
     refetchInterval: realtimeStatus === 'connected' ? false : 10_000,
   });

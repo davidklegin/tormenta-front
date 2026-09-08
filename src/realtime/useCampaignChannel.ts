@@ -109,6 +109,12 @@ export function useCampaignChannel(campaignId: number | null | undefined, enable
         // vida e mana tira os números em todas as outras telas.
         queryClient.invalidateQueries({ queryKey: ['character', event.character_id], exact: false });
         queryClient.invalidateQueries({ queryKey: ['characters'] });
+
+        // As fichas DESTA mesa são outra consulta, e é dela que a lista de
+        // peças do tabuleiro lê PV e PM. Sem invalidá-la, o mestre via o
+        // número de quando abriu a tela: o jogador tomava dano na ficha e a
+        // lista continuava mostrando a vida cheia.
+        queryClient.invalidateQueries({ queryKey: ['campaign-characters', campaignId] });
       });
 
       channel.listen('.character.conditions.updated', (event: ConditionsUpdatedEvent) => {
@@ -169,6 +175,12 @@ export function useCampaignChannel(campaignId: number | null | undefined, enable
       // pessoal não chegar: o GET devolve a versão certa para quem perguntou.
       channel.listen('.battlemap.updated', (event: BattleMapState) => {
         markEventReceived();
+
+        // A tela de TV pede o tabuleiro com a visão da mesa, e é exatamente
+        // essa a versão que este canal carrega — então ela vai direto para a
+        // chave dela, sem a ressalva abaixo: não há payload de mestre para
+        // atropelar ali.
+        queryClient.setQueryData<BattleMapState>(['battlemap', campaignId, 'mesa'], event);
 
         const atual = queryClient.getQueryData<BattleMapState>(['battlemap', campaignId]);
 

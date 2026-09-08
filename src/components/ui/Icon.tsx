@@ -46,6 +46,8 @@ const GLYPHS = {
   excluir: 'trash-can-outline',
   confirmar: 'check',
   buscar: 'magnify',
+  telaCheia: 'fullscreen',
+  sairDaTelaCheia: 'fullscreen-exit',
   configuracoes: 'cog-outline',
   sair: 'logout',
   convidar: 'account-plus-outline',

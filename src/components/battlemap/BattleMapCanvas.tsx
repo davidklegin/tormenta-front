@@ -18,6 +18,9 @@ import {
   distanciaEmMetros,
   formatarDistancia,
   METROS_POR_QUADRADO,
+  nomeDaCelula,
+  nomeDaColuna,
+  nomeDaLinha,
   retanguloComoPoligono,
   type Celula,
 } from './geometry';
@@ -42,6 +45,14 @@ type Props = {
   onRemoverArea?: (efeitoId: string) => void;
   /** Muda de valor quando a barra pede o mapa de volta ao centro. */
   pedidoDeCentralizar?: number;
+  /**
+   * Tabuleiro de olhar, não de mexer — a tela de TV.
+   *
+   * Pan e zoom continuam: alguém precisa poder aproximar o canto do salão na
+   * tela grande. O que sai é a seleção e o arrasto de peça, que ali só
+   * produziriam movimentos que ninguém pediu.
+   */
+  somenteLeitura?: boolean;
 };
 
 const ZOOM_MINIMO = 0.35;
@@ -68,6 +79,7 @@ export function BattleMapCanvas({
   onMarcarArea,
   onRemoverArea,
   pedidoDeCentralizar = 0,
+  somenteLeitura = false,
 }: Props) {
   const { colors, isDark } = useTheme();
 
@@ -77,6 +89,17 @@ export function BattleMapCanvas({
   const linhas = grid?.height ?? 15;
   const larguraMapa = colunas * lado;
   const alturaMapa = linhas * lado;
+
+  /**
+   * Até onde o enquadramento automático pode ampliar.
+   *
+   * Na TV o mapa preenche a tela: um tabuleiro pequeno projetado a três metros
+   * de distância, com metade da tela em volta vazia, não serve para nada. Nas
+   * telas de trabalho o teto fica em 1 — ampliar sozinho um mapa de dez
+   * quadrados deixaria o mestre com quatro quadrados à vista ao abrir, e ele
+   * está ali para ver a cena inteira.
+   */
+  const zoomDeAbertura = somenteLeitura ? ZOOM_MAXIMO : 1;
 
   const escala = useSharedValue(1);
   const escalaSalva = useSharedValue(1);
@@ -156,12 +179,13 @@ export function BattleMapCanvas({
 
   const podeMover = useCallback(
     (token: BattleMapToken) => {
+      if (somenteLeitura) return false;
       if (ehMestre) return true;
       if (token.entity_type !== 'player_character') return false;
 
       return token.entity_id !== null && minhasFichas.includes(token.entity_id);
     },
-    [ehMestre, minhasFichas]
+    [ehMestre, minhasFichas, somenteLeitura]
   );
 
   useEffect(() => {
@@ -200,7 +224,7 @@ export function BattleMapCanvas({
       // Abre com o mapa inteiro à vista. Entrar no tabuleiro com o zoom em 1
       // mostraria um canto do salão e deixaria a mesa procurando as peças.
       const cabe = Math.min(width / larguraMapa, height / alturaMapa);
-      const inicial = Math.min(1, Math.max(ZOOM_MINIMO, cabe));
+      const inicial = Math.min(zoomDeAbertura, Math.max(ZOOM_MINIMO, cabe));
 
       escala.value = inicial;
       escalaSalva.value = inicial;
@@ -209,7 +233,10 @@ export function BattleMapCanvas({
       deslocSalvoX.value = deslocX.value;
       deslocSalvoY.value = deslocY.value;
     },
-    [larguraMapa, alturaMapa, escala, escalaSalva, deslocX, deslocY, deslocSalvoX, deslocSalvoY]
+    [
+      larguraMapa, alturaMapa, zoomDeAbertura,
+      escala, escalaSalva, deslocX, deslocY, deslocSalvoX, deslocSalvoY,
+    ]
   );
 
   /**
@@ -225,7 +252,7 @@ export function BattleMapCanvas({
     if (largura <= 0 || larguraMapa <= 0) return;
 
     const cabe = Math.min(largura / larguraMapa, altura / alturaMapa);
-    const proxima = Math.min(1, Math.max(ZOOM_MINIMO, cabe));
+    const proxima = Math.min(zoomDeAbertura, Math.max(ZOOM_MINIMO, cabe));
     const centroX = (largura - larguraMapa * proxima) / 2;
     const centroY = (altura - alturaMapa * proxima) / 2;
 
@@ -237,7 +264,7 @@ export function BattleMapCanvas({
     deslocSalvoX.value = centroX;
     deslocSalvoY.value = centroY;
   }, [
-    pedidoDeCentralizar, larguraMapa, alturaMapa,
+    pedidoDeCentralizar, larguraMapa, alturaMapa, zoomDeAbertura,
     escala, escalaSalva, deslocX, deslocY, deslocSalvoX, deslocSalvoY,
   ]);
 
@@ -256,6 +283,9 @@ export function BattleMapCanvas({
 
       const foraDoMapa = celula.x < 0 || celula.y < 0 || celula.x >= colunas || celula.y >= linhas;
       if (foraDoMapa) return;
+
+      // Na TV o toque não faz nada: o gesto que resta é arrastar e aproximar.
+      if (somenteLeitura) return;
 
       // O modo Área não passa por aqui: o toque dele é resolvido no fim do
       // Pan (ver `fecharArea`), porque Tap e Pan simultâneos se atropelam.
@@ -316,6 +346,7 @@ export function BattleMapCanvas({
       colunas,
       linhas,
       modo,
+      somenteLeitura,
       battleMap.tokens,
       battleMap.area_effects,
       cantoDaNevoa,
@@ -623,6 +654,13 @@ export function BattleMapCanvas({
 
             <Grade colunas={colunas} linhas={linhas} lado={lado} cor={corDaGrade} />
 
+            {/* As coordenadas vêm logo depois da grade, e não por cima de tudo:
+                a peça precisa cobrir o rótulo do quadrado onde ela está — e
+                quando ela está lá, ninguém precisa do rótulo. Por isso as
+                réguas são desenhadas nas QUATRO bordas: com o grupo enfileirado
+                na linha de cima, é a de baixo que continua legível. */}
+            <Coordenadas colunas={colunas} linhas={linhas} lado={lado} />
+
             {/* A névoa vem depois da grade e antes das peças: cobre o cenário,
                 mas não some com o personagem de quem está olhando. */}
             <View pointerEvents="none">
@@ -694,13 +732,23 @@ export function BattleMapCanvas({
               ? formatarDistancia(distanciaEmMetros(regua.de, regua.para))
               : formatarDistancia((passosDoArrasto ?? 0) * METROS_POR_QUADRADO)}
           </Text>
+
+          {/* De onde para onde, pelo nome dos quadrados: é assim que a mesa
+              repete a medida em voz alta sem ter de apontar para a tela. */}
+          {regua && (
+            <Text variant="caption" tone="muted">
+              {nomeDaCelula(regua.de)} → {nomeDaCelula(regua.para)}
+            </Text>
+          )}
         </View>
       )}
 
       {modo === 'nevoa' && (
         <View style={[styles.dica, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Text variant="caption" tone="muted">
-            {cantoDaNevoa ? 'Toque no canto oposto.' : 'Toque num canto da área a cobrir.'}
+            {cantoDaNevoa
+              ? `Canto em ${nomeDaCelula(cantoDaNevoa)}. Toque no canto oposto.`
+              : 'Toque num canto da área a cobrir.'}
           </Text>
         </View>
       )}
@@ -755,6 +803,106 @@ function Grade({
             backgroundColor: cor,
           }}
         />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * As coordenadas da grade: letras nas colunas, números nas linhas.
+ *
+ * Existem para a mesa falar do tabuleiro em voz alta. Sem elas, "o goblin está
+ * ali" precisa de um dedo apontando a tela — o que funciona na mesa de casa e
+ * não funciona para quem joga pelo celular, nem quando a mesa olha a TV e o
+ * mestre olha o computador dele.
+ *
+ * Ficam DENTRO da primeira linha e da primeira coluna, e não em réguas fora da
+ * grade: fora, a faixa some da tela assim que o mapa é arrastado para o canto,
+ * e é justamente quando o mapa está aproximado que alguém precisa nomear um
+ * quadrado. Aqui elas acompanham o mapa em qualquer posição e zoom.
+ *
+ * Uma `View` por rótulo custa colunas + linhas — trinta e cinco num mapa de
+ * 20×15 —, e não uma por quadrado.
+ */
+function Coordenadas({ colunas, linhas, lado }: { colunas: number; linhas: number; lado: number }) {
+  const eixoX = useMemo(() => Array.from({ length: colunas }, (_, i) => i), [colunas]);
+  const eixoY = useMemo(() => Array.from({ length: linhas }, (_, i) => i), [linhas]);
+
+  // Acompanha o quadrado, com um piso: num mapa de 100 colunas o lado fica
+  // pequeno, e uma letra de três pixels é sujeira na tela, não informação.
+  const fonte = Math.max(8, Math.round(lado * 0.3));
+
+  // Branco com sombra preta, e não a cor do tema: por baixo pode estar a
+  // pedra clara de uma cripta ou o breu de uma caverna, e o rótulo precisa
+  // continuar legível nos dois.
+  const estiloDoRotulo = {
+    position: 'absolute' as const,
+    fontSize: fonte,
+    lineHeight: Math.round(fonte * 1.25),
+    color: 'rgba(255,255,255,0.92)',
+    textShadowColor: 'rgba(0,0,0,0.85)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+    textAlign: 'center' as const,
+  };
+
+  const centradoNaLinha = (linha: number) =>
+    linha * lado + Math.max(0, (lado - fonte * 1.25) / 2);
+
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      {eixoX.map((coluna) => (
+        <Text
+          key={`coluna-topo-${coluna}`}
+          variant="caption"
+          numberOfLines={1}
+          style={[estiloDoRotulo, { left: coluna * lado, top: 1, width: lado }]}
+        >
+          {nomeDaColuna(coluna)}
+        </Text>
+      ))}
+
+      {eixoX.map((coluna) => (
+        <Text
+          key={`coluna-base-${coluna}`}
+          variant="caption"
+          numberOfLines={1}
+          style={[
+            estiloDoRotulo,
+            {
+              left: coluna * lado,
+              top: (linhas - 1) * lado + Math.max(0, lado - fonte * 1.25 - 1),
+              width: lado,
+            },
+          ]}
+        >
+          {nomeDaColuna(coluna)}
+        </Text>
+      ))}
+
+      {eixoY.map((linha) => (
+        <Text
+          key={`linha-esquerda-${linha}`}
+          variant="caption"
+          numberOfLines={1}
+          style={[estiloDoRotulo, { left: 0, top: centradoNaLinha(linha), width: lado }]}
+        >
+          {nomeDaLinha(linha)}
+        </Text>
+      ))}
+
+      {eixoY.map((linha) => (
+        <Text
+          key={`linha-direita-${linha}`}
+          variant="caption"
+          numberOfLines={1}
+          style={[
+            estiloDoRotulo,
+            { left: (colunas - 1) * lado, top: centradoNaLinha(linha), width: lado },
+          ]}
+        >
+          {nomeDaLinha(linha)}
+        </Text>
       ))}
     </View>
   );

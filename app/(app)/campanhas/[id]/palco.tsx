@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ErrorState, Icon, Loading, Screen, Text } from '@/components/ui';
@@ -42,6 +44,21 @@ export default function StageScreen() {
   // a abertura da tela e a queda do socket.
   useCampaignChannel(campaignId, true);
 
+  /**
+   * A imagem ocupando a tela inteira.
+   *
+   * Duas origens, e as duas convivem. O mestre liga o modo pela mesa de
+   * controle e ele vale para a mesa inteira — é a resposta para "vejam este
+   * mapa direito", e chega à TV e a cada celular pelo canal da campanha. O
+   * toque na imagem amplia só na tela de quem tocou: o jogador que quer olhar
+   * de perto no aparelho dele não deve mexer no que está projetado na parede.
+   *
+   * Fica aqui em cima, e não junto de onde é usado, porque abaixo há saídas
+   * antecipadas — um hook depois delas rodaria em umas renderizações e não em
+   * outras.
+   */
+  const [ampliadaAqui, setAmpliadaAqui] = useState(false);
+
   // Numa TV, a barra de endereço rouba um pedaço da cena. Na web dá para pedir
   // tela cheia — nas plataformas nativas o app já ocupa tudo.
   const emTelaCheia = acaoDeTelaCheia();
@@ -68,6 +85,90 @@ export default function StageScreen() {
 
   const poster = stage.data?.poster ?? null;
   const combate = combat.data ?? null;
+
+  const imagem = poster?.image_url ?? null;
+  const ampliada = imagem !== null && (stage.data?.image_fullscreen || ampliadaAqui);
+
+  if (ampliada && imagem) {
+    return (
+      <Pressable
+        onPress={() => setAmpliadaAqui((atual) => !atual)}
+        accessibilityRole="button"
+        accessibilityLabel={`${poster?.title ?? 'Imagem'} em tela cheia. Toque para voltar ao cartaz.`}
+        // Preto, e não a cor do tema: é o fundo que some atrás de um mapa
+        // recortado, e é o que a mesa espera de uma projeção.
+        style={{ flex: 1, backgroundColor: '#000' }}
+      >
+        <Image
+          source={{ uri: imagem }}
+          style={{ flex: 1 }}
+          /* `contain`: um mapa cortado nas bordas perde justamente o corredor
+             que alguém está procurando. */
+          contentFit="contain"
+          transition={200}
+          accessibilityLabel={poster?.title}
+        />
+
+        {/* O nome, apagado, num canto. Sem ele a mesa perde a referência do
+            que está vendo quando a imagem não se explica sozinha. */}
+        {poster?.title ? (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: insets.bottom + spacing.md,
+              left: spacing.lg,
+              opacity: 0.6,
+            }}
+            pointerEvents="none"
+          >
+            <Text variant="small" style={{ color: '#fff' }}>
+              {poster.title}
+            </Text>
+          </View>
+        ) : null}
+
+        {/* Sair continua ao alcance: no celular do jogador esta é a tela
+            inteira, e sem saída ele fica preso na imagem. */}
+        <Pressable
+          onPress={() => {
+            setAmpliadaAqui(false);
+            router.back();
+          }}
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel="Sair do palco"
+          style={{
+            position: 'absolute',
+            top: insets.top + spacing.sm,
+            left: spacing.lg,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.xxs,
+            opacity: 0.55,
+          }}
+        >
+          <Icon name="voltar" size={16} color="#fff" />
+          <Text variant="caption" style={{ color: '#fff' }}>
+            Sair
+          </Text>
+        </Pressable>
+
+        {combate?.active ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: insets.top + spacing.sm,
+              right: spacing.lg,
+              zIndex: 50,
+            }}
+            pointerEvents="none"
+          >
+            <InitiativeTracker combat={combate} compacto={isPhone} />
+          </View>
+        ) : null}
+      </Pressable>
+    );
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -113,7 +214,25 @@ export default function StageScreen() {
       {/* O cartaz ocupa a altura da tela e fica centrado nela: numa TV, um NPC
           curto encostado no topo deixa dois terços de vazio embaixo. */}
       <View style={{ minHeight: altura - 140, justifyContent: 'center', paddingVertical: isPhone ? spacing.md : spacing.xl }}>
-        {poster ? <StagePosterView poster={poster} modo="palco" /> : <Cortina nome={campaign.data?.name} />}
+        {poster ? (
+          /*
+            Tocar no cartaz amplia a imagem — só aqui, nesta tela.
+
+            É a saída do jogador que está no celular e quer ver o mapa de
+            perto sem pedir ao mestre. Quando não há imagem, o toque não faz
+            nada, e por isso o cartaz não vira botão nesse caso.
+          */
+          <Pressable
+            onPress={imagem ? () => setAmpliadaAqui(true) : undefined}
+            disabled={!imagem}
+            accessibilityRole={imagem ? 'button' : undefined}
+            accessibilityLabel={imagem ? `Ver ${poster.title} em tela cheia` : undefined}
+          >
+            <StagePosterView poster={poster} modo="palco" />
+          </Pressable>
+        ) : (
+          <Cortina nome={campaign.data?.name} />
+        )}
       </View>
       </Screen>
 

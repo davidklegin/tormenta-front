@@ -16,8 +16,14 @@ export default function AppLayout() {
   // rodapé — e, no celular, ela quebra em três linhas —, e a fila de
   // iniciativa já mostra PV e PM de quem está na cena. A pastilha, que é
   // arrastável e nasce justamente naquele canto, só cobria botões.
+  //
+  // As telas viradas para a mesa saem pelo outro motivo: ali é o grupo inteiro
+  // olhando um mapa ou um cartaz, e o PV de quem por acaso está logado naquele
+  // aparelho não é assunto de todo mundo — nem serve para nada projetado na
+  // parede, onde ele só cobre um pedaço da cena.
   const rota = usePathname();
-  const noTabuleiro = rota.endsWith('/tabuleiro');
+  const naTelaDaMesa =
+    rota.endsWith('/tabuleiro') || rota.endsWith('/tabuleiro-tv') || rota.endsWith('/palco');
 
   if (status !== 'authenticated') {
     return <Redirect href="/(auth)/login" />;
@@ -47,7 +53,7 @@ export default function AppLayout() {
           alerta da vez: o jogador precisa do número no grimório e nas
           anotações, não só na aba Combate — e o painel que a pastilha abre não
           pode depender de qual rota está montada. */}
-      {!noTabuleiro && <VitalsOverlay />}
+      {!naTelaDaMesa && <VitalsOverlay />}
     </View>
   );
 }

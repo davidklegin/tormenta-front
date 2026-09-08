@@ -1,13 +1,19 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Icon, Text } from '@/components/ui';
 import { radius, spacing, stroke, useTheme } from '@/theme';
-import type { AreaEffect, BattleMapToken, CombatEntry, ReferenceCondition } from '@/api/types';
+import type {
+  AreaEffect,
+  BattleMapToken,
+  CharacterSummary,
+  CombatEntry,
+  ReferenceCondition,
+} from '@/api/types';
 import { useConditionCatalog } from '../combat/ConditionBadges';
-import { DamagePopover } from '../combat/DamagePopover';
 import { acharEntradaDoToken } from '../combat/vinculo';
-import { alcanceEmMetros, formatarDistancia, nomeDaForma } from './geometry';
+import { alcanceEmMetros, formatarDistancia, nomeDaCelula, nomeDaForma } from './geometry';
+import { vitaisDaPeca, type VitaisDaPeca } from './vitais';
 
 type Props = {
   tokens: BattleMapToken[];
@@ -15,6 +21,13 @@ type Props = {
   areas: AreaEffect[];
   /** A ordem de iniciativa, quando há combate. Vazia fora dele. */
   entries: CombatEntry[];
+  /**
+   * As fichas da mesa — de onde saem o PV e o PM dos personagens.
+   *
+   * Não vêm da linha da iniciativa porque essa linha só existe durante o
+   * combate, e a lista de peças é consultada também na preparação da cena.
+   */
+  fichas: CharacterSummary[];
   conditions: ReferenceCondition[];
   selecionado: number | null;
   aberta: boolean;
@@ -27,7 +40,6 @@ type Props = {
   onRemoverArea: (efeitoId: string) => void;
   onAbrirCondicoes: (entry: CombatEntry) => void;
   onAbrirFicha: (entry: CombatEntry) => void;
-  onAplicarDano: (entryId: string, amount: number) => void;
 };
 
 /** Os tamanhos do livro, na ordem em que a mesa os nomeia. */
@@ -64,6 +76,7 @@ export function MasterTokenSidebar({
   tokens,
   areas,
   entries,
+  fichas,
   conditions,
   selecionado,
   aberta,
@@ -76,7 +89,6 @@ export function MasterTokenSidebar({
   onRemoverArea,
   onAbrirCondicoes,
   onAbrirFicha,
-  onAplicarDano,
 }: Props) {
   const { colors } = useTheme();
   const catalogo = useConditionCatalog(conditions);
@@ -96,11 +108,18 @@ export function MasterTokenSidebar({
     [tokens, selecionado]
   );
 
+  const acharEntrada = useCallback(
+    (token: BattleMapToken) => (entries.length > 0 ? acharEntradaDoToken(token, entries) : null),
+    [entries]
+  );
+
   // A linha da iniciativa da peça selecionada, quando ela tem uma. Um barril
   // ou um marcador de cenário não têm PV para perder.
-  const entrada = useMemo(
-    () => (peca && entries.length > 0 ? acharEntradaDoToken(peca, entries) : null),
-    [peca, entries]
+  const entrada = useMemo(() => (peca ? acharEntrada(peca) : null), [peca, acharEntrada]);
+
+  const vitaisDaSelecionada = useMemo(
+    () => (peca ? vitaisDaPeca(peca, entrada, fichas) : null),
+    [peca, entrada, fichas]
   );
 
   const escondidas = useMemo(() => tokens.filter((token) => !token.visible).length, [tokens]);
@@ -210,7 +229,7 @@ export function MasterTokenSidebar({
           <LinhaDaPeca
             key={token.id}
             token={token}
-            entrada={entries.length > 0 ? acharEntradaDoToken(token, entries) : null}
+            vitais={vitaisDaPeca(token, acharEntrada(token), fichas)}
             catalogo={catalogo}
             selecionada={selecionado === token.id}
             onPress={() => onSelecionar(selecionado === token.id ? null : token.id)}
@@ -222,7 +241,7 @@ export function MasterTokenSidebar({
           <LinhaDaPeca
             key={token.id}
             token={token}
-            entrada={entries.length > 0 ? acharEntradaDoToken(token, entries) : null}
+            vitais={vitaisDaPeca(token, acharEntrada(token), fichas)}
             catalogo={catalogo}
             selecionada={selecionado === token.id}
             onPress={() => onSelecionar(selecionado === token.id ? null : token.id)}
@@ -340,13 +359,40 @@ export function MasterTokenSidebar({
             </View>
           )}
 
-          {entrada && (
-            <DamagePopover
-              alvo={entrada.name}
-              onSubmit={(valor) => onAplicarDano(entrada.id, valor)}
-              onClose={() => onSelecionar(null)}
-            />
-          )}
+          {/*
+            PV, PM e o quadrado onde a peça está.
+
+            Não há caixa de dano aqui: neste tabuleiro o dano é resolvido em
+            voz alta na mesa, e o PV do personagem mora na ficha dele. O que
+            esta faixa faz é *informar* — quanto sobrou e onde a peça está,
+            para o mestre dizer "o goblin de C7 ainda está de pé".
+          */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing.sm,
+              paddingHorizontal: spacing.sm,
+              paddingTop: spacing.xxs,
+              paddingBottom: spacing.xs,
+            }}
+          >
+            {vitaisDaSelecionada ? (
+              <Text variant="caption" tone="muted">
+                {vitaisDaSelecionada.pv.atual}/{vitaisDaSelecionada.pv.max} PV
+                {vitaisDaSelecionada.pv.temp > 0 ? ` (+${vitaisDaSelecionada.pv.temp})` : ''}
+                {vitaisDaSelecionada.pm
+                  ? ` · ${vitaisDaSelecionada.pm.atual}/${vitaisDaSelecionada.pm.max} PM`
+                  : ''}
+              </Text>
+            ) : null}
+
+            <View style={{ flex: 1 }} />
+
+            <Text variant="caption" tone="muted">
+              {nomeDaCelula(peca.position)}
+            </Text>
+          </View>
         </View>
       )}
     </View>
@@ -364,19 +410,20 @@ function Secao({ rotulo }: { rotulo: string }) {
 /**
  * Uma peça na lista.
  *
- * O PV vem da linha da iniciativa quando ela existe — o tabuleiro não guarda
- * vida, e inventar um número aqui faria a lista discordar da fila de
- * iniciativa sobre quanto o goblin aguenta.
+ * O tabuleiro não guarda vida: o PV e o PM vêm da ficha do personagem ou da
+ * linha da iniciativa do NPC (ver `vitaisDaPeca`). Inventar um número aqui
+ * faria esta lista discordar da fila de iniciativa — que está na mesma tela —
+ * sobre quanto o goblin aguenta.
  */
 function LinhaDaPeca({
   token,
-  entrada,
+  vitais,
   catalogo,
   selecionada,
   onPress,
 }: {
   token: BattleMapToken;
-  entrada: CombatEntry | null;
+  vitais: VitaisDaPeca | null;
   catalogo: Map<string, ReferenceCondition>;
   selecionada: boolean;
   onPress: () => void;
@@ -453,10 +500,11 @@ function LinhaDaPeca({
           )}
         </View>
 
-        {entrada && (
+        {vitais && (
           <Text variant="caption" tone="muted">
-            {entrada.current_hp}/{entrada.max_hp} PV
-            {entrada.temp_hp > 0 ? ` (+${entrada.temp_hp})` : ''}
+            {vitais.pv.atual}/{vitais.pv.max} PV
+            {vitais.pv.temp > 0 ? ` (+${vitais.pv.temp})` : ''}
+            {vitais.pm ? ` · ${vitais.pm.atual}/${vitais.pm.max} PM` : ''}
           </Text>
         )}
 

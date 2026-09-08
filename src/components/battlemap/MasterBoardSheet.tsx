@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'expo-image';
 import { Button, Divider, Icon, Input, SegmentedControl, Sheet, Text } from '@/components/ui';
+import { useCampaignCharacters } from '@/hooks/useCampaigns';
 import { useStageItems } from '@/hooks/useStage';
 import { formDeImagem, prepararImagemParaUpload } from '@/utils/imagem';
 import { radius, spacing, useTheme } from '@/theme';
@@ -245,10 +246,17 @@ function AbaDasPecas({
 }) {
   const { colors } = useTheme();
   const acervo = useStageItems(campaignId, { kind: 'npc' });
+  const fichas = useCampaignCharacters(campaignId);
 
   const jaNoMapa = new Set(
     battleMap.tokens.filter((t) => t.entity_type === 'stage_item').map((t) => t.entity_id)
   );
+
+  const fichasNoMapa = new Set(
+    battleMap.tokens.filter((t) => t.entity_type === 'player_character').map((t) => t.entity_id)
+  );
+
+  const foraDoMapa = fichas.data?.filter((ficha) => !fichasNoMapa.has(ficha.id)) ?? [];
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled">
@@ -256,10 +264,99 @@ function AbaDasPecas({
         label="Trazer o grupo para o mapa"
         onPress={() => controles.adicionarGrupo.mutate()}
         loading={controles.adicionarGrupo.isPending}
+        disabled={foraDoMapa.length === 0}
       />
       <Text variant="caption" tone="muted" center style={{ marginTop: spacing.xxs }}>
-        Põe as fichas da mesa que ainda não estão no tabuleiro.
+        {foraDoMapa.length === 0
+          ? 'Todas as fichas da mesa já estão no tabuleiro.'
+          : `Põe de uma vez as ${foraDoMapa.length} ficha${foraDoMapa.length > 1 ? 's' : ''} que faltam.`}
       </Text>
+
+      <Divider />
+
+      {/*
+        As fichas, uma a uma.
+
+        O botão acima traz o grupo inteiro, e é o gesto de começar um combate.
+        Este é o outro caso, que era o que faltava: o ladino que chega à sala
+        depois dos outros, o personagem que voltou do subterrâneo, a ficha que
+        o mestre tirou do mapa e quer devolver. Trazer o grupo de novo não
+        resolvia — quem já está no tabuleiro é ignorado, e então nada acontece.
+      */}
+      <Text variant="small" tone="muted">
+        Fichas da mesa
+      </Text>
+      <View style={{ height: spacing.xs }} />
+
+      {fichas.data?.length ? (
+        fichas.data.map((ficha) => {
+          const noMapa = fichasNoMapa.has(ficha.id);
+
+          return (
+            <Pressable
+              key={ficha.id}
+              disabled={noMapa}
+              onPress={() =>
+                controles.adicionarToken.mutate({
+                  entity_type: 'player_character',
+                  entity_id: ficha.id,
+                  position_x: 0,
+                  position_y: 0,
+                  size: 1,
+                })
+              }
+              accessibilityRole="button"
+              accessibilityLabel={
+                noMapa ? `${ficha.name} já está no tabuleiro` : `Pôr ${ficha.name} no tabuleiro`
+              }
+              style={[styles.linha, { borderColor: colors.border, opacity: noMapa ? 0.5 : 1 }]}
+            >
+              <View
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: radius.sm,
+                  overflow: 'hidden',
+                  backgroundColor: colors.surfaceAlt,
+                }}
+              >
+                {ficha.avatar_url ? (
+                  <Image
+                    source={{ uri: ficha.avatar_url }}
+                    style={{ width: '100%', height: '100%' }}
+                    contentFit="cover"
+                  />
+                ) : null}
+              </View>
+
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text variant="small" numberOfLines={1}>
+                  {ficha.name}
+                </Text>
+                <Text variant="caption" tone="muted" numberOfLines={1}>
+                  {ficha.class_label ? `${ficha.class_label} · ` : ''}
+                  {ficha.hp.current}/{ficha.hp.max} PV
+                  {ficha.mp.max > 0 ? ` · ${ficha.mp.current}/${ficha.mp.max} PM` : ''}
+                </Text>
+              </View>
+
+              {noMapa ? (
+                <Text variant="caption" tone="muted">
+                  no mapa
+                </Text>
+              ) : (
+                <Icon name="adicionarCirculo" size={18} color={colors.primary} />
+              )}
+            </Pressable>
+          );
+        })
+      ) : (
+        <Text variant="caption" tone="muted">
+          {fichas.isLoading
+            ? 'Lendo as fichas da mesa…'
+            : 'Nenhuma ficha vinculada a esta campanha ainda.'}
+        </Text>
+      )}
 
       <Divider />
 

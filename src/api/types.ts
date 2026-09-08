@@ -1070,6 +1070,15 @@ export type StagePoster = {
 export type StageState = {
   live: boolean;
   poster: StagePoster | null;
+  /**
+   * A imagem do cartaz ocupa a tela inteira do palco.
+   *
+   * É estado do palco, e não de cada aparelho: quem liga é o mestre, e a TV da
+   * sala e o celular de cada jogador entram e saem juntos. O servidor devolve
+   * `false` quando o cartaz no ar não tem imagem, então a tela não precisa
+   * checar as duas coisas.
+   */
+  image_fullscreen: boolean;
   source: { type: string; id: number | null } | null;
   shown_by: { id: number; name: string; nickname: string | null } | null;
   shown_at: string | null;

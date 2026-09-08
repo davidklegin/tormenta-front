@@ -47,7 +47,12 @@ export default function CampaignCalendarScreen() {
   const campaignId = Number(params.id);
 
   const campaign = useCampaign(campaignId);
-  const podeMarcar = campaign.data?.is_master ?? false;
+
+  // Marcar é de quem senta à mesa, e não só do mestre: quem sabe se dá para
+  // jogar na sexta é o grupo. Mexer no que já está marcado continua sendo de
+  // quem marcou (e do mestre) — o servidor responde isso por linha, em
+  // `can_edit`, e a lista abaixo obedece a ele.
+  const podeMarcar = campaign.data?.is_member ?? false;
 
   const [mes, setMes] = useState(() => new Date());
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
@@ -93,7 +98,9 @@ export default function CampaignCalendarScreen() {
         title="Calendário"
         subtitle={campaign.data?.name}
         back
-        actions={podeMarcar ? <Button label="Marcar sessão" size="sm" onPress={abrirNova} /> : undefined}
+        actions={
+          podeMarcar ? <Button label="Marcar no calendário" size="sm" onPress={abrirNova} /> : undefined
+        }
       />
 
       <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: spacing.lg, alignItems: 'flex-start' }}>
@@ -134,10 +141,10 @@ export default function CampaignCalendarScreen() {
               title={diaSelecionado ? 'Nada marcado neste dia' : 'Nenhuma sessão neste mês'}
               description={
                 podeMarcar
-                  ? 'Marque a próxima sessão para a mesa saber quando jogar.'
-                  : 'O mestre ainda não marcou sessões para este mês.'
+                  ? 'Marque a próxima sessão — ou qualquer coisa que a mesa precise saber.'
+                  : 'Ninguém marcou nada para este mês.'
               }
-              actionLabel={podeMarcar ? 'Marcar sessão' : undefined}
+              actionLabel={podeMarcar ? 'Marcar no calendário' : undefined}
               onAction={podeMarcar ? abrirNova : undefined}
             />
           ) : (
@@ -179,6 +186,16 @@ export default function CampaignCalendarScreen() {
                   {dataPorExtenso(sessao.starts_at)}
                   {sessao.duration_minutes ? ` · ${duracao(sessao.duration_minutes)}` : ''}
                 </Text>
+
+                {/* Quem marcou. Com a mesa inteira escrevendo no calendário,
+                    "quem foi que pôs isso aqui?" vira uma pergunta real — e a
+                    resposta também diz de relance o que é editável por quem. */}
+                {sessao.created_by ? (
+                  <Text variant="caption" tone="muted">
+                    Marcada por {sessao.created_by.nickname || sessao.created_by.name}
+                    {sessao.can_edit ? '' : ' · só quem marcou remarca'}
+                  </Text>
+                ) : null}
 
                 {sessao.location ? (
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
@@ -273,7 +290,7 @@ function SessionForm({
     <Sheet
       visible={visible}
       onClose={onClose}
-      title={session ? 'Editar sessão' : 'Marcar sessão'}
+      title={session ? 'Editar' : 'Marcar no calendário'}
       footer={
         <>
           <Button label="Cancelar" variant="ghost" onPress={onClose} style={{ flex: 1 }} />
@@ -292,6 +309,10 @@ function SessionForm({
         onChangeText={setTitulo}
         placeholder="Sessão 12: A Caverna Rubra"
       />
+      <Text variant="caption" tone="muted">
+        Serve para a sessão e para o resto: o jantar antes de jogar, a semana em
+        que você não pode, o aniversário do grupo.
+      </Text>
 
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         <View style={{ flex: 1.4 }}>

@@ -41,8 +41,18 @@ export type AddAreaEffectInput = Omit<AreaEffect, 'id'>;
  * escondido nem criatura sob a névoa (ver BattleMap::toState no backend).
  */
 export const battleMapApi = {
-  state: (campaignId: number) =>
-    apiRequest<Envelope<BattleMapState>>(`/campaigns/${campaignId}/battlemap`).then((r) => r.data),
+  /**
+   * O tabuleiro como quem pediu deve vê-lo.
+   *
+   * `comoMesa` pede a visão dos jogadores mesmo quando quem chama é o mestre —
+   * é o que a tela de TV usa. Sem isso, a tela grande virada para a mesa
+   * mostraria a emboscada e o que está sob a névoa, porque a conta logada
+   * naquele aparelho costuma ser a do mestre.
+   */
+  state: (campaignId: number, comoMesa = false) =>
+    apiRequest<Envelope<BattleMapState>>(`/campaigns/${campaignId}/battlemap`, {
+      query: comoMesa ? { view: 'table' } : undefined,
+    }).then((r) => r.data),
 
   update: (campaignId: number, data: BattleMapUpdateInput) =>
     apiRequest<Envelope<BattleMapState>>(`/campaigns/${campaignId}/battlemap`, {

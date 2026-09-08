@@ -94,6 +94,18 @@ export const stageApi = {
       (r) => r.data
     ),
 
+  /**
+   * A imagem que está no ar ocupa a tela inteira do palco — ou volta ao cartaz.
+   *
+   * Muda só a flag: quem exibiu e desde quando continuam os mesmos, e a mesa
+   * não vê o cartaz piscar como se fosse uma exibição nova.
+   */
+  fullscreen: (campaignId: number, fullscreen: boolean) =>
+    apiRequest<Envelope<StageState>>(`/campaigns/${campaignId}/stage/fullscreen`, {
+      method: 'PATCH',
+      body: { fullscreen },
+    }).then((r) => r.data),
+
   /** Manda para as anotações da campanha o que está no ar agora. */
   publishLive: (campaignId: number) =>
     apiRequest<{ message: string; data: CampaignNote }>(`/campaigns/${campaignId}/stage/publish`, {
