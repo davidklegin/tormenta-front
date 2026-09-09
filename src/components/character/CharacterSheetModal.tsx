@@ -1,25 +1,41 @@
+import { useState } from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { Button, ErrorState, Loading, Select, Sheet, Text } from '@/components/ui';
-import { useCharacter, useUpdateVitals } from '@/hooks/useCharacters';
-import { spacing, useTheme, vitalColors } from '@/theme';
-import { AttackManager } from './AttackManager';
+import type { Character } from '@/api/types';
+import { Button, Chip, ErrorState, Loading, Select, Sheet, Text } from '@/components/ui';
+import { useCharacter } from '@/hooks/useCharacters';
+import { SHEET_TABS } from '@/rules';
+import { spacing } from '@/theme';
 import { AttributeGrid } from './AttributeGrid';
 import { CharacterStats } from './CharacterHeader';
-import { ConditionManager } from './ConditionManager';
-import { VitalTracker } from './VitalTracker';
+import { AbilitiesContent } from './tabs/AbilitiesTab';
+import { BackgroundContent } from './tabs/BackgroundTab';
+import { CombatContent } from './tabs/CombatTab';
+import { EquipmentContent } from './tabs/EquipmentTab';
+import { NotesContent } from './tabs/NotesTab';
+import { PowersContent } from './tabs/PowersTab';
+import { SkillsContent } from './tabs/SkillsTab';
+import { SpellsContent } from './tabs/SpellsTab';
+
+type Aba = (typeof SHEET_TABS)[number]['key'];
 
 /**
- * A ficha em um painel, para consultar sem sair da tela.
+ * A ficha inteira em um painel, para consultar sem sair da tela.
  *
  * Nasceu do tabuleiro. Lá o jogador passa a luta inteira olhando o mapa, e
- * tudo o que ele precisa saber no turno — quanto tem de Defesa, o bônus do
- * ataque, quanto sobrou de mana, que condição está pegando nele — morava atrás
- * de uma navegação que descarrega o mapa e o traz de volta rolado e recentrado.
+ * tudo o que o turno dele exige — quanto tem de Defesa, o bônus do ataque, o
+ * texto do poder que ele quer usar, o custo da magia — morava atrás de uma
+ * navegação que descarrega o mapa e o traz de volta rolado e recentrado.
  *
- * O que entra aqui é o que se usa **durante** a rodada, na ordem em que a mesa
- * pergunta. O que ficou de fora — perícias, equipamento, magias, história — é
- * consulta de mesa parada, e continua a um toque no rodapé, na ficha inteira.
+ * São as mesmas abas da ficha, e o mesmo conteúdo: cada uma delas é o
+ * componente que a rota correspondente monta (`tabs/`), e não uma segunda
+ * versão resumida. Uma cópia enxuta pareceria a ficha, discordaria dela na
+ * primeira mudança de regra, e mandaria o jogador conferir na tela grande
+ * justamente quando a resposta importasse.
+ *
+ * Os atributos e a faixa de Defesa aparecem só na aba de combate. Na ficha eles
+ * moram no cabeçalho, valendo para todas; aqui, repetidos em cima de cada aba,
+ * comeriam metade da altura de um painel que já é a metade de baixo da tela.
  *
  * A ficha só é carregada enquanto o painel está aberto: no tabuleiro, manter o
  * personagem inteiro em memória a sessão toda seria pagar por uma tela que
@@ -39,20 +55,11 @@ export function CharacterSheetModal({
   onClose: () => void;
   onTrocarFicha?: (characterId: number) => void;
 }) {
-  const { colors } = useTheme();
-  const vitais = vitalColors(colors);
+  const [aba, setAba] = useState<Aba>('index');
 
   const query = useCharacter(visible ? characterId : null);
-  const vitals = useUpdateVitals(characterId);
 
   const personagem = query.data;
-  const podeAlterar = personagem?.permissions.can_update_vitals ?? false;
-
-  const ajustar = (campo: 'current_hp' | 'current_mp') => (delta: number) =>
-    vitals.mutate({ deltas: { [campo]: delta } });
-
-  const definir = (campo: 'current_hp' | 'current_mp') => (valor: number) =>
-    vitals.mutate({ absolutes: { [campo]: valor } });
 
   const abrirFichaInteira = () => {
     onClose();
@@ -76,7 +83,7 @@ export function CharacterSheetModal({
       footer={
         <>
           <Button
-            label="Ficha inteira"
+            label="Abrir em tela cheia"
             variant="ghost"
             onPress={abrirFichaInteira}
             style={{ flex: 1 }}
@@ -105,62 +112,56 @@ export function CharacterSheetModal({
             />
           ) : null}
 
-          <AttributeGrid attributes={personagem.attributes} />
+          {/* As abas quebram em linha em vez de rolarem para o lado: numa lista
+              horizontal, as últimas ficam além da borda sem nada na tela dizendo
+              que existem, e "Magias" é exatamente a que o jogador procura. */}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+            {SHEET_TABS.map((item) => (
+              <Chip
+                key={item.key}
+                label={item.label}
+                tone={aba === item.key ? 'gold' : 'neutral'}
+                selected={aba === item.key}
+                compact
+                onPress={() => setAba(item.key)}
+              />
+            ))}
+          </View>
 
-          <CharacterStats character={personagem} />
-
-          <VitalTracker
-            label="Pontos de Vida"
-            icon="vida"
-            current={personagem.hp.current}
-            max={personagem.hp.max}
-            temp={personagem.hp.temp}
-            color={vitais.hp}
-            trackColor={vitais.hpTrack}
-            editable={podeAlterar}
-            onChange={ajustar('current_hp')}
-            onSetValue={definir('current_hp')}
-            footnote={
-              personagem.hp.is_dead
-                ? 'Morto.'
-                : personagem.hp.is_down
-                  ? `Inconsciente e sangrando. Morre em ${personagem.hp.death_threshold} PV.`
-                  : undefined
-            }
-          />
-
-          <VitalTracker
-            label="Pontos de Mana"
-            icon="mana"
-            current={personagem.mp.current}
-            max={personagem.mp.max}
-            temp={personagem.mp.temp}
-            color={vitais.mp}
-            trackColor={vitais.mpTrack}
-            editable={podeAlterar}
-            onChange={ajustar('current_mp')}
-            onSetValue={definir('current_mp')}
-          />
-
-          <ConditionManager
-            characterId={characterId}
-            conditions={personagem.conditions}
-            editable={podeAlterar}
-          />
-
-          <AttackManager
-            characterId={characterId}
-            attacks={personagem.attacks}
-            editable={personagem.permissions.can_update}
-          />
-
-          {podeAlterar ? null : (
-            <Text variant="small" tone="muted">
-              Esta ficha não é sua: o painel mostra os números, mas não os altera.
-            </Text>
-          )}
+          <Conteudo aba={aba} characterId={characterId} character={personagem} />
         </View>
       ) : null}
     </Sheet>
+  );
+}
+
+function Conteudo({
+  aba,
+  characterId,
+  character,
+}: {
+  aba: Aba;
+  characterId: number;
+  character: Character;
+}) {
+  if (aba === 'pericias') return <SkillsContent characterId={characterId} character={character} />;
+  if (aba === 'equipamento')
+    return <EquipmentContent characterId={characterId} character={character} />;
+  if (aba === 'poderes') return <PowersContent characterId={characterId} character={character} />;
+  if (aba === 'magias') return <SpellsContent characterId={characterId} character={character} />;
+  if (aba === 'habilidades')
+    return <AbilitiesContent characterId={characterId} character={character} />;
+  if (aba === 'background')
+    return <BackgroundContent characterId={characterId} character={character} />;
+  if (aba === 'anotacoes') return <NotesContent characterId={characterId} character={character} />;
+
+  return (
+    <View style={{ gap: spacing.md }}>
+      <AttributeGrid attributes={character.attributes} />
+
+      <CharacterStats character={character} />
+
+      <CombatContent characterId={characterId} character={character} />
+    </View>
   );
 }
