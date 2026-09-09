@@ -59,6 +59,21 @@ const ZOOM_MINIMO = 0.35;
 const ZOOM_MAXIMO = 3;
 
 /**
+ * Quanto o quadrado abre maior do que o estritamente necessário para o mapa
+ * caber na tela.
+ *
+ * O enquadramento automático espremia o tabuleiro até a última borda entrar, e
+ * o que sobrava era um quadrado de meio centímetro: a mesa lia a grade, mas não
+ * a peça dentro dela. Quinze por cento a mais resolvem a leitura e custam uma
+ * fatia estreita das bordas, que volta com um arrastar de dedo — e o mapa
+ * continua centrado, então o que sai de vista é metade disso de cada lado.
+ *
+ * Vale só onde há mão: na tela da TV ninguém vai arrastar o mapa de volta, e
+ * ali o que sair da borda fica perdido para a mesa inteira.
+ */
+const AMPLIACAO_DA_GRADE = 1.15;
+
+/**
  * O tabuleiro desenhado.
  *
  * Tudo o que o mapa mostra é *célula*, não pixel: a névoa cobre quadrados, a
@@ -99,7 +114,10 @@ export function BattleMapCanvas({
    * quadrados deixaria o mestre com quatro quadrados à vista ao abrir, e ele
    * está ali para ver a cena inteira.
    */
-  const zoomDeAbertura = somenteLeitura ? ZOOM_MAXIMO : 1;
+  const zoomDeAbertura = somenteLeitura ? ZOOM_MAXIMO : AMPLIACAO_DA_GRADE;
+
+  /** Ver `AMPLIACAO_DA_GRADE`: a TV continua enquadrando o mapa inteiro. */
+  const ampliacao = somenteLeitura ? 1 : AMPLIACAO_DA_GRADE;
 
   const escala = useSharedValue(1);
   const escalaSalva = useSharedValue(1);
@@ -221,9 +239,11 @@ export function BattleMapCanvas({
 
       if (width <= 0 || larguraMapa <= 0) return;
 
-      // Abre com o mapa inteiro à vista. Entrar no tabuleiro com o zoom em 1
-      // mostraria um canto do salão e deixaria a mesa procurando as peças.
-      const cabe = Math.min(width / larguraMapa, height / alturaMapa);
+      // Abre com o mapa à vista, e um pouco maior que o exato — ver
+      // `AMPLIACAO_DA_GRADE`. Entrar no tabuleiro com o zoom em 1 mostraria um
+      // canto do salão e deixaria a mesa procurando as peças; entrar com o
+      // enquadramento exato mostra o salão inteiro e nenhuma peça legível.
+      const cabe = Math.min(width / larguraMapa, height / alturaMapa) * ampliacao;
       const inicial = Math.min(zoomDeAbertura, Math.max(ZOOM_MINIMO, cabe));
 
       escala.value = inicial;
@@ -234,7 +254,7 @@ export function BattleMapCanvas({
       deslocSalvoY.value = deslocY.value;
     },
     [
-      larguraMapa, alturaMapa, zoomDeAbertura,
+      larguraMapa, alturaMapa, zoomDeAbertura, ampliacao,
       escala, escalaSalva, deslocX, deslocY, deslocSalvoX, deslocSalvoY,
     ]
   );
@@ -251,7 +271,7 @@ export function BattleMapCanvas({
     const { largura, altura } = janela.current;
     if (largura <= 0 || larguraMapa <= 0) return;
 
-    const cabe = Math.min(largura / larguraMapa, altura / alturaMapa);
+    const cabe = Math.min(largura / larguraMapa, altura / alturaMapa) * ampliacao;
     const proxima = Math.min(zoomDeAbertura, Math.max(ZOOM_MINIMO, cabe));
     const centroX = (largura - larguraMapa * proxima) / 2;
     const centroY = (altura - alturaMapa * proxima) / 2;
@@ -264,7 +284,7 @@ export function BattleMapCanvas({
     deslocSalvoX.value = centroX;
     deslocSalvoY.value = centroY;
   }, [
-    pedidoDeCentralizar, larguraMapa, alturaMapa, zoomDeAbertura,
+    pedidoDeCentralizar, larguraMapa, alturaMapa, zoomDeAbertura, ampliacao,
     escala, escalaSalva, deslocX, deslocY, deslocSalvoX, deslocSalvoY,
   ]);
 
