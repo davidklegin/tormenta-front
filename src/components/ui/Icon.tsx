@@ -35,6 +35,7 @@ const GLYPHS = {
   jogadores: 'account-group-outline',
   dinheiro: 'treasure-chest',
   carga: 'sack',
+  reserva: 'lock-outline',
 
   // Ações
   voltar: 'chevron-left',

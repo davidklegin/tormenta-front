@@ -20,6 +20,8 @@ import type {
 export type CharacterPayload = {
   name: string;
   campaign_id?: number | null;
+  /** Guarda a ficha longe da mesa; recusado junto com uma campanha. */
+  is_reserve?: boolean;
   race_id?: number | null;
   race_variant?: string | null;
   racial_attribute_choices?: string[] | null;

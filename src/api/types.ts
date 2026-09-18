@@ -136,6 +136,8 @@ export type CharacterSummary = {
   class_label: string;
   level: number;
   campaign: { id: number; name: string } | null;
+  /** Na reserva: só o dono e o mestre enxergam (CharacterPolicy::view). */
+  is_reserve: boolean;
   player: { id: number; name: string } | null;
   hp: Vitals;
   mp: Vitals;
@@ -508,6 +510,8 @@ export type Character = {
   version: number;
   player?: User;
   campaign: { id: number; name: string } | null;
+  /** Na reserva: só o dono e o mestre enxergam. Vincular a uma campanha tira dela. */
+  is_reserve: boolean;
   race: { id: number; key: string | null; name: string; variant?: string | null } | null;
   racial_attribute_choices: AttributeKey[] | null;
   origin: { id: number; key: string | null; name: string } | null;

@@ -59,8 +59,16 @@ export function VitalsOverlay({
 
     // Sem escolha guardada (ou com a ficha apagada), o marcador assume a de
     // movimento mais recente: é a que o jogador está usando na mesa, e assim
-    // ele não precisa configurar nada para ver o marcador funcionando.
-    return [...minhas].sort((a, b) => (b.updated_at ?? '').localeCompare(a.updated_at ?? ''))[0] ?? null;
+    // ele não precisa configurar nada para ver o marcador funcionando. A
+    // reserva fica de fora enquanto houver outra — montar o substituto mexe
+    // na ficha dele o tempo todo, e ele ainda não está em jogo.
+    const emJogo = minhas.filter((ficha) => !ficha.is_reserve);
+
+    return (
+      [...(emJogo.length > 0 ? emJogo : minhas)].sort((a, b) =>
+        (b.updated_at ?? '').localeCompare(a.updated_at ?? '')
+      )[0] ?? null
+    );
   }, [minhas, characterId]);
 
   useEffect(() => {

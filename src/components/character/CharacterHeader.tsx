@@ -64,6 +64,7 @@ export function CharacterHeader({ character }: { character: Character }) {
           <View style={{ flexDirection: 'row', gap: spacing.xs, flexWrap: 'wrap' }}>
             <Chip label={character.progression.tier} tone="neutral" compact />
             {character.campaign ? <Chip label={character.campaign.name} tone="neutral" compact /> : null}
+            {character.is_reserve ? <Chip label="Na reserva" tone="arcane" compact /> : null}
           </View>
         </View>
 

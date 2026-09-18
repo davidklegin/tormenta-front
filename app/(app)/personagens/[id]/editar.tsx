@@ -4,7 +4,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ApiError, charactersApi } from '@/api';
-import type { AttributeKey, Character } from '@/api/types';
+import type { AttributeKey, Character, CharacterClassAbility } from '@/api/types';
 import {
   Button,
   Card,
@@ -12,6 +12,7 @@ import {
   Chip,
   ErrorState,
   HelpNote,
+  Icon,
   Input,
   Loading,
   Screen,
@@ -38,7 +39,13 @@ import {
 } from '@/rules';
 import { ArquivoGrandeDemaisError } from '@/utils/arquivo';
 import { prepararImagemParaUpload } from '@/utils/imagem';
-import { spacing } from '@/theme';
+import { spacing, useTheme } from '@/theme';
+
+/**
+ * Uma linha do editor de classes. `chave` só identifica a linha na tela: a
+ * classe dela pode mudar, e a linha nova ainda nem tem classe.
+ */
+type LinhaDeClasse = { chave: string; gameClassId: number | null; level: string };
 
 /**
  * Edição da ficha.
@@ -72,6 +79,7 @@ export default function EditCharacterScreen() {
 }
 
 function EditForm({ character }: { character: Character }) {
+  const { colors } = useTheme();
   const queryClient = useQueryClient();
   const reference = useReference();
   const campaigns = useLinkableCampaigns();
@@ -81,6 +89,7 @@ function EditForm({ character }: { character: Character }) {
   const [name, setName] = useState(character.name);
   const [experience, setExperience] = useState(String(character.experience));
   const [campaignId, setCampaignId] = useState<number | null>(character.campaign?.id ?? null);
+  const [reserva, setReserva] = useState(character.is_reserve);
   const [raca, setRaca] = useState<RaceChoice>({
     raceId: character.race?.id ?? null,
     variant: character.race?.variant ?? null,
@@ -107,8 +116,16 @@ function EditForm({ character }: { character: Character }) {
       ) as Record<AttributeKey, string>
   );
   const [keyAttribute, setKeyAttribute] = useState<AttributeKey | null>(character.key_attribute.selected);
-  const [classLevels, setClassLevels] = useState<Record<number, string>>(() =>
-    Object.fromEntries(character.classes.map((entry) => [entry.game_class_id, String(entry.level)]))
+  // A primária vai na primeira linha: é a posição que o servidor lê como
+  // primária quando a lista volta.
+  const [classes, setClasses] = useState<LinhaDeClasse[]>(() =>
+    [...character.classes]
+      .sort((a, b) => Number(b.is_primary) - Number(a.is_primary))
+      .map((entry) => ({
+        chave: String(entry.id),
+        gameClassId: entry.game_class_id,
+        level: String(entry.level),
+      }))
   );
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -162,25 +179,86 @@ function EditForm({ character }: { character: Character }) {
     }
   }
 
-  /** Atributo-chave em uso: a escolha do jogador ou o herdado da classe. */
-  const effectiveKeyAttribute = keyAttribute ?? character.key_attribute.value;
+  /** A classe do catálogo de cada linha, na mesma ordem; nula na linha ainda vazia. */
+  const classesEscolhidas = useMemo(
+    () => classes.map((linha) => reference.data?.classes.find((c) => c.id === linha.gameClassId) ?? null),
+    [classes, reference.data?.classes]
+  );
 
   /**
-   * Prévia dos PM com os níveis e atributos ainda em edição — o mesmo cálculo
-   * que o servidor refaz ao salvar: PM por nível de cada classe + atributo-chave.
+   * Atributos-chave sugeridos pelas classes em edição — a primária primeiro,
+   * sem repetir —, a mesma lista que o servidor monta. Trocar de classe troca
+   * as estrelas na hora, antes de salvar.
+   */
+  const suggestedKeyAttributes = useMemo<AttributeKey[]>(() => {
+    if (!reference.data) return character.key_attribute.suggested;
+
+    const lista: AttributeKey[] = [];
+
+    for (const gameClass of classesEscolhidas) {
+      for (const key of gameClass?.key_attributes ?? []) {
+        if (!lista.includes(key)) lista.push(key);
+      }
+    }
+
+    return lista;
+  }, [reference.data, classesEscolhidas, character.key_attribute.suggested]);
+
+  /** Atributo-chave em uso: a escolha do jogador ou o herdado da classe. */
+  const effectiveKeyAttribute = keyAttribute ?? suggestedKeyAttributes[0] ?? null;
+
+  /**
+   * Prévia dos PM com as classes, os níveis e os atributos ainda em edição — o
+   * mesmo cálculo que o servidor refaz ao salvar: PM por nível de cada classe +
+   * atributo-chave.
    */
   const mpPreview = useMemo(() => {
-    const fromClasses = character.classes.reduce((total, entry) => {
-      const perLevel = reference.data?.classes.find((c) => c.key === entry.key)?.mp_per_level ?? 0;
-      const level = Number.parseInt(classLevels[entry.game_class_id] ?? '1', 10) || 1;
+    const fromClasses = classes.reduce((total, linha, indice) => {
+      const perLevel = classesEscolhidas[indice]?.mp_per_level ?? 0;
 
-      return total + perLevel * level;
+      return total + perLevel * nivelDaLinha(linha);
     }, 0);
 
     const bonus = effectiveKeyAttribute ? previewAttributeTotal(effectiveKeyAttribute) : 0;
 
     return { total: Math.max(0, fromClasses + bonus), fromClasses, bonus };
-  }, [character.classes, reference.data?.classes, classLevels, effectiveKeyAttribute, attributes]);
+  }, [classes, classesEscolhidas, effectiveKeyAttribute, attributes]);
+
+  /**
+   * Habilidades de uma classe que saiu da ficha. Elas não somem sozinhas —
+   * foram escritas pelo jogador, e podem ter anotação dele —, mas precisam
+   * ser ditas, senão o guerreiro que virou arcanista segue com Ataque Especial.
+   */
+  const habilidadesDeClasseQueSaiu = useMemo(
+    () =>
+      character.class_abilities.filter(
+        (habilidade) =>
+          habilidade.game_class_id !== null &&
+          !classes.some((linha) => linha.gameClassId === habilidade.game_class_id)
+      ),
+    [character.class_abilities, classes]
+  );
+
+  function trocarClasse(indice: number, gameClassId: number | null) {
+    setClasses((anteriores) =>
+      anteriores.map((linha, i) => (i === indice ? { ...linha, gameClassId } : linha))
+    );
+  }
+
+  function trocarNivel(indice: number, level: string) {
+    setClasses((anteriores) => anteriores.map((linha, i) => (i === indice ? { ...linha, level } : linha)));
+  }
+
+  function somarClasse() {
+    setClasses((anteriores) => [
+      ...anteriores,
+      { chave: `nova-${Date.now()}`, gameClassId: null, level: '1' },
+    ]);
+  }
+
+  function tirarClasse(indice: number) {
+    setClasses((anteriores) => anteriores.filter((_, i) => i !== indice));
+  }
 
   /**
    * Prévia da Defesa com o atributo e o bônus ainda em edição — a mesma conta
@@ -280,12 +358,21 @@ function EditForm({ character }: { character: Character }) {
       return;
     }
 
+    if (classes.some((linha) => linha.gameClassId === null)) {
+      setError('Escolha a classe de cada linha em “Classe e nível” — ou tire a que ficou vazia.');
+
+      return;
+    }
+
     try {
       await updateCharacter.mutateAsync({
         name: name.trim(),
         version: character.version,
         experience: Number.parseInt(experience, 10) || 0,
-        campaign_id: campaignId,
+        // Na reserva, a ficha fica fora das campanhas; e vincular é o que a
+        // tira de lá — o servidor não aceita as duas coisas juntas.
+        campaign_id: reserva ? null : campaignId,
+        is_reserve: reserva,
         race_id: raca.raceId,
         race_variant: raca.variant,
         origin_id: race?.skips_origin ? null : originId,
@@ -303,10 +390,10 @@ function EditForm({ character }: { character: Character }) {
         ),
         racial_attribute_choices: raca.choices,
         key_attribute: keyAttribute,
-        classes: character.classes.map((entry) => ({
-          game_class_id: entry.game_class_id,
-          level: Number.parseInt(classLevels[entry.game_class_id] ?? '1', 10) || 1,
-          is_primary: entry.is_primary,
+        classes: classes.map((linha, indice) => ({
+          game_class_id: linha.gameClassId as number,
+          level: nivelDaLinha(linha),
+          is_primary: indice === 0,
         })),
       });
 
@@ -360,11 +447,33 @@ function EditForm({ character }: { character: Character }) {
 
           <Select
             label="Campanha"
-            value={campaignId}
+            value={reserva ? null : campaignId}
             options={(campaigns.data ?? []).map((entry) => ({ value: entry.id, label: entry.name }))}
-            onChange={setCampaignId}
+            onChange={(id) => {
+              setCampaignId(id);
+              // Vincular é como a ficha sai da reserva.
+              if (id !== null) setReserva(false);
+            }}
             clearable
-            hint="Qualquer mesa serve — você não precisa participar dela para levar a ficha."
+            hint={
+              character.is_reserve && !reserva && campaignId !== null
+                ? 'Ao salvar, a ficha sai da reserva e a mesa passa a ver.'
+                : 'Qualquer mesa serve — você não precisa participar dela para levar a ficha.'
+            }
+          />
+
+          <Checkbox
+            label="Guardar na reserva"
+            checked={reserva}
+            onChange={(marcado) => {
+              setReserva(marcado);
+              if (marcado) setCampaignId(null);
+            }}
+            hint={
+              reserva && character.campaign
+                ? `Ao salvar, a ficha sai de ${character.campaign.name} e só você e o mestre passam a ver.`
+                : 'Só você e o mestre veem a ficha. Quando vincular a uma campanha, ela sai da reserva e a mesa passa a ver.'
+            }
           />
 
           <RaceFields
@@ -425,19 +534,76 @@ function EditForm({ character }: { character: Character }) {
         </View>
       </Card>
 
-      <Card title="Níveis de classe" subtitle="A soma define o nível de personagem (p. 35)">
+      <Card title="Classe e nível" subtitle="A soma dos níveis de classe é o nível de personagem (p. 35)">
         <View style={{ gap: spacing.md }}>
-          {character.classes.map((entry) => (
-            <Input
-              key={entry.id}
-              label={entry.name ?? 'Classe'}
-              value={classLevels[entry.game_class_id] ?? '1'}
-              onChangeText={(text) =>
-                setClassLevels((previous) => ({ ...previous, [entry.game_class_id]: text }))
-              }
-              keyboardType="number-pad"
-            />
+          {classes.map((linha, indice) => (
+            <View key={linha.chave} style={{ gap: spacing.xs }}>
+              {/* Pela base: o rótulo do Select é maior que o do Input, e
+                  alinhados pelo topo os dois campos ficam em alturas diferentes. */}
+              <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'flex-end' }}>
+                <View style={{ flex: 2 }}>
+                  <Select
+                    label={indice === 0 ? 'Classe' : 'Outra classe'}
+                    value={linha.gameClassId}
+                    // Cada classe entra uma vez só: a que já está noutra linha
+                    // sobe de nível lá, e não aparece de novo aqui.
+                    options={(reference.data?.classes ?? [])
+                      .filter(
+                        (entry) =>
+                          entry.id === linha.gameClassId ||
+                          !classes.some((outra) => outra.gameClassId === entry.id)
+                      )
+                      .map((entry) => ({
+                        value: entry.id,
+                        label: entry.name,
+                        description: entry.short_description ?? undefined,
+                      }))}
+                    onChange={(id) => trocarClasse(indice, id)}
+                    placeholder="Escolha a classe…"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Input
+                    label="Nível"
+                    value={linha.level}
+                    onChangeText={(text) => trocarNivel(indice, text)}
+                    keyboardType="number-pad"
+                  />
+                </View>
+              </View>
+
+              {classes.length > 1 ? (
+                <View style={{ flexDirection: 'row' }}>
+                  <Button
+                    label={indice === 0 ? 'Tirar a classe principal' : 'Tirar esta classe'}
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => tirarClasse(indice)}
+                  />
+                </View>
+              ) : null}
+            </View>
           ))}
+
+          <Button
+            label="Somar outra classe (multiclasse)"
+            variant="secondary"
+            onPress={somarClasse}
+            icon={<Icon name="adicionar" size={16} color={colors.textMuted} />}
+          />
+
+          <HelpNote collapsible source="Livro base, p. 35">
+            Para trocar de classe, escolha outra no campo Classe. Multiclasse é quando o personagem, ao subir
+            de nível, pega o nível de uma classe diferente — um guerreiro 3 que vira guerreiro 3 / ladino 1
+            tem nível de personagem 4. A primeira linha é a classe principal.
+          </HelpNote>
+
+          {habilidadesDeClasseQueSaiu.length > 0 ? (
+            <HelpNote tone="warning">
+              {`As habilidades de ${nomesDasClasses(habilidadesDeClasseQueSaiu)} continuam na aba Habilidades (${habilidadesDeClasseQueSaiu.map((habilidade) => habilidade.name).join(', ')}). Depois de salvar, apague lá as que não valem mais.`}
+            </HelpNote>
+          ) : null}
+
           <Text variant="small" tone="muted">
             PV e PM máximos são recalculados automaticamente ao salvar.
           </Text>
@@ -468,7 +634,7 @@ function EditForm({ character }: { character: Character }) {
 
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
             {ATTRIBUTE_ORDER.map((key) => {
-              const suggested = character.key_attribute.suggested.includes(key);
+              const suggested = suggestedKeyAttributes.includes(key);
 
               return (
                 <Chip
@@ -490,7 +656,7 @@ function EditForm({ character }: { character: Character }) {
             → {mpPreview.total}
           </Text>
 
-          {keyAttribute !== null && character.key_attribute.suggested.length > 0 ? (
+          {keyAttribute !== null && suggestedKeyAttributes.length > 0 ? (
             <Button
               label="Voltar ao atributo da classe"
               variant="secondary"
@@ -619,6 +785,22 @@ function EditForm({ character }: { character: Character }) {
       <Button label="Excluir personagem" variant="danger" onPress={confirmDelete} fullWidth />
     </Screen>
   );
+}
+
+/** Nível digitado numa linha de classe: vazio ou inválido conta como 1, e nunca menos. */
+function nivelDaLinha(linha: LinhaDeClasse): number {
+  return Math.max(1, Number.parseInt(linha.level, 10) || 1);
+}
+
+/** "guerreiro" ou "guerreiro e ladino", com o nome que a ficha já traz em cada habilidade. */
+function nomesDasClasses(habilidades: CharacterClassAbility[]): string {
+  const nomes = [
+    ...new Set(habilidades.map((habilidade) => habilidade.game_class_name ?? 'uma classe que saiu')),
+  ];
+
+  const ultimo = nomes.pop() ?? '';
+
+  return nomes.length > 0 ? `${nomes.join(', ')} e ${ultimo}` : ultimo;
 }
 
 /**

@@ -12,6 +12,9 @@ import { severityFor } from '@/rules';
  * Na lista geral, a ficha é de outra pessoa, então o card também diz de quem
  * é. O `player` só vem preenchido nessa lista — na minha, seria repetir meu
  * próprio nome em cada card.
+ *
+ * A ficha na reserva diz que está guardada no lugar da campanha: para o dono,
+ * quem mais a vê; para o mestre, que a mesa ainda não sabe dela.
  */
 export function CharacterCard({ character, onPress }: { character: CharacterSummary; onPress?: () => void }) {
   const { colors } = useTheme();
@@ -78,6 +81,15 @@ export function CharacterCard({ character, onPress }: { character: CharacterSumm
               <Icon name="campanhas" size={13} color={colors.textSubtle} />
               <Text variant="small" tone="muted" numberOfLines={1} style={{ flex: 1 }}>
                 {character.campaign.name}
+              </Text>
+            </View>
+          ) : character.is_reserve ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+              <Icon name="reserva" size={13} color={colors.textSubtle} />
+              <Text variant="small" tone="muted" numberOfLines={1} style={{ flex: 1 }}>
+                {character.is_owner
+                  ? 'Na reserva — só você e o mestre veem'
+                  : 'Na reserva — a mesa ainda não vê'}
               </Text>
             </View>
           ) : (

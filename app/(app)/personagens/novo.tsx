@@ -1,9 +1,20 @@
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ApiError } from '@/api';
 import type { AttributeKey } from '@/api/types';
-import { Button, Card, Chip, HelpNote, Input, Loading, Screen, Select, Text } from '@/components/ui';
+import {
+  Button,
+  Card,
+  Checkbox,
+  Chip,
+  HelpNote,
+  Input,
+  Loading,
+  Screen,
+  Select,
+  Text,
+} from '@/components/ui';
 import { PageHeader } from '@/components/layout';
 import {
   RaceFields,
@@ -23,8 +34,12 @@ import { radius, spacing, useTheme } from '@/theme';
  * Segue a ordem do livro: atributos, raça, classe, origem e divindade
  * (p. 17 a 105). Os modificadores raciais e os PV/PM iniciais são aplicados
  * pelo servidor a partir dos catálogos, então a tela só coleta as escolhas.
+ *
+ * `?reserva=1` — o botão "Guardar um novo" da seção Reserva — abre a tela com
+ * a ficha já marcada para nascer guardada, longe dos olhos da mesa.
  */
 export default function NewCharacterScreen() {
+  const params = useLocalSearchParams<{ reserva?: string }>();
   const reference = useReference();
   const campaigns = useLinkableCampaigns();
   const createCharacter = useCreateCharacter();
@@ -37,6 +52,7 @@ export default function NewCharacterScreen() {
   const [originId, setOriginId] = useState<number | null>(null);
   const [deityId, setDeityId] = useState<number | null>(null);
   const [campaignId, setCampaignId] = useState<number | null>(null);
+  const [reserva, setReserva] = useState(params.reserva === '1');
   const [attributes, setAttributes] = useState<Record<AttributeKey, number>>({
     for: 0,
     des: 0,
@@ -124,7 +140,8 @@ export default function NewCharacterScreen() {
         racial_attribute_choices: raca.choices.length > 0 ? raca.choices : undefined,
         origin_id: race?.skips_origin ? null : originId,
         deity_id: deityId,
-        campaign_id: campaignId,
+        campaign_id: reserva ? null : campaignId,
+        is_reserve: reserva,
         attributes,
         key_attribute: keyAttribute,
         classes: [{ key: classKey, level: Math.max(1, Number.parseInt(level, 10) || 1), is_primary: true }],
@@ -134,7 +151,10 @@ export default function NewCharacterScreen() {
     } catch (err) {
       setError(
         err instanceof ApiError
-          ? (err.fieldError('name') ?? err.fieldError('classes') ?? err.message)
+          ? (err.fieldError('name') ??
+              err.fieldError('classes') ??
+              err.fieldError('is_reserve') ??
+              err.message)
           : 'Não foi possível criar o personagem.'
       );
     }
@@ -227,11 +247,26 @@ export default function NewCharacterScreen() {
 
           <Select
             label="Campanha"
-            value={campaignId}
+            value={reserva ? null : campaignId}
             options={(campaigns.data ?? []).map((entry) => ({ value: entry.id, label: entry.name }))}
-            onChange={setCampaignId}
+            onChange={(id) => {
+              setCampaignId(id);
+              // Estar numa campanha é o que mostra a ficha à mesa: as duas
+              // coisas não andam juntas.
+              if (id !== null) setReserva(false);
+            }}
             clearable
             hint="Qualquer mesa serve, e dá para vincular depois, na ficha."
+          />
+
+          <Checkbox
+            label="Guardar na reserva"
+            checked={reserva}
+            onChange={(marcado) => {
+              setReserva(marcado);
+              if (marcado) setCampaignId(null);
+            }}
+            hint="Só você e o mestre veem a ficha — bom para o substituto caso seu personagem morra, ou para uma ideia que ainda não vai para a mesa. Quando vincular a uma campanha, ela sai da reserva."
           />
         </View>
       </Card>
