@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { charactersApi } from '@/api';
-import type { CatalogSpell } from '@/api/types';
-import { Button, Chip, Icon, Input, Loading, SegmentedControl, Sheet, Text } from '@/components/ui';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { charactersApi, spellsApi } from '@/api';
+import type { CatalogSpell, CatalogSpellDetail } from '@/api/types';
+import { Button, Chip, DetailRow, Icon, Input, Loading, SegmentedControl, Sheet, Text } from '@/components/ui';
 import { useSpellCatalog, useSpellCatalogFilters } from '@/hooks/useSpellCatalog';
 import { radius, spacing, tones, useTheme } from '@/theme';
 
@@ -39,6 +39,7 @@ export function SpellCatalogSheet({
   const [busca, setBusca] = useState('');
   const [circulo, setCirculo] = useState<string>('todos');
   const [selecionadas, setSelecionadas] = useState<number[]>([]);
+  const [aberta, setAberta] = useState<number | null>(null);
 
   const catalogo = useSpellCatalog({
     q: busca || undefined,
@@ -121,8 +122,10 @@ export function SpellCatalogSheet({
               spell={magia}
               selected={selecionadas.includes(magia.id)}
               known={conhecidas.has(magia.id)}
+              expanded={aberta === magia.id}
               last={index === catalogo.spells.length - 1}
-              onPress={() => alternar(magia.id)}
+              onToggle={() => alternar(magia.id)}
+              onExpand={() => setAberta((atual) => (atual === magia.id ? null : magia.id))}
             />
           ))}
         </View>
@@ -146,70 +149,179 @@ export function SpellCatalogSheet({
   );
 }
 
+/**
+ * Uma magia da lista.
+ *
+ * O "i" abre a ficha completa ali mesmo, para o jogador decidir se quer a
+ * magia sem sair do grimório. A descrição só é baixada quando pedida — a lista
+ * carrega cinquenta magias por vez e vem sem ela.
+ */
 function LinhaDaMagia({
   spell,
   selected,
   known,
+  expanded,
   last,
-  onPress,
+  onToggle,
+  onExpand,
 }: {
   spell: CatalogSpell;
   selected: boolean;
   known: boolean;
+  expanded: boolean;
   last: boolean;
-  onPress: () => void;
+  onToggle: () => void;
+  onExpand: () => void;
 }) {
   const { colors } = useTheme();
   const arcano = tones(colors).arcane;
   const marcada = known || selected;
 
   return (
-    <Pressable
-      onPress={known ? undefined : onPress}
-      disabled={known}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: marcada, disabled: known }}
-      accessibilityLabel={`${spell.name}, ${spell.header}, ${spell.mp_cost} pontos de mana`}
-      style={({ pressed }) => ({
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
-        paddingVertical: spacing.md,
-        paddingHorizontal: spacing.lg,
-        borderBottomWidth: last ? 0 : 1,
-        borderBottomColor: colors.border,
-        backgroundColor: selected ? colors.surfaceHover : pressed ? colors.surfaceHover : 'transparent',
-        opacity: known ? 0.55 : 1,
-      })}
-    >
+    <View style={{ borderBottomWidth: last ? 0 : 1, borderBottomColor: colors.border }}>
       <View
         style={{
-          width: 20,
-          height: 20,
-          borderRadius: radius.sm,
-          borderWidth: 1,
-          borderColor: marcada ? arcano.border : colors.borderStrong,
-          backgroundColor: marcada ? arcano.solid : 'transparent',
+          flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'center',
+          backgroundColor: selected ? colors.surfaceHover : 'transparent',
         }}
       >
-        {marcada ? <Icon name="confirmar" size={14} color={arcano.onSolid} /> : null}
+        <Pressable
+          onPress={known ? undefined : onToggle}
+          disabled={known}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: marcada, disabled: known }}
+          accessibilityLabel={`${spell.name}, ${spell.header}, ${spell.mp_cost} pontos de mana`}
+          style={({ pressed }) => ({
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+            paddingVertical: spacing.md,
+            paddingLeft: spacing.lg,
+            backgroundColor: pressed ? colors.surfaceHover : 'transparent',
+            opacity: known ? 0.55 : 1,
+          })}
+        >
+          <View
+            style={{
+              width: 20,
+              height: 20,
+              borderRadius: radius.sm,
+              borderWidth: 1,
+              borderColor: marcada ? arcano.border : colors.borderStrong,
+              backgroundColor: marcada ? arcano.solid : 'transparent',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {marcada ? <Icon name="confirmar" size={14} color={arcano.onSolid} /> : null}
+          </View>
+
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text variant="body" numberOfLines={1}>
+              {spell.name}
+            </Text>
+            <Text variant="caption" tone="muted" numberOfLines={1}>
+              {known ? 'Já conhecida · ' : ''}
+              {spell.header}
+              {spell.execution ? ` · ${spell.execution}` : ''}
+              {spell.range_text ? ` · ${spell.range_text}` : ''}
+            </Text>
+          </View>
+
+          <Chip label={`${spell.mp_cost} PM`} compact tone="arcane" />
+        </Pressable>
+
+        {/* Fora do Pressable da seleção e sem o esmaecido: ler a magia que já
+            se conhece também é útil. */}
+        <Pressable
+          onPress={onExpand}
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          accessibilityLabel={expanded ? `Fechar ficha de ${spell.name}` : `Ler ficha de ${spell.name}`}
+          hitSlop={spacing.sm}
+          style={({ pressed }) => ({
+            paddingVertical: spacing.md,
+            paddingHorizontal: spacing.lg,
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Icon name={expanded ? 'expandir' : 'info'} size={18} color={colors.textMuted} />
+        </Pressable>
       </View>
 
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text variant="body" numberOfLines={1}>
-          {spell.name}
-        </Text>
-        <Text variant="caption" tone="muted" numberOfLines={1}>
-          {known ? 'Já conhecida · ' : ''}
-          {spell.header}
-          {spell.execution ? ` · ${spell.execution}` : ''}
-          {spell.range_text ? ` · ${spell.range_text}` : ''}
-        </Text>
-      </View>
+      {expanded ? <FichaDaMagia id={spell.id} /> : null}
+    </View>
+  );
+}
 
-      <Chip label={`${spell.mp_cost} PM`} compact tone="arcane" />
-    </Pressable>
+/** A ficha completa, buscada só quando o jogador abre aquela linha. */
+function FichaDaMagia({ id }: { id: number }) {
+  const { colors } = useTheme();
+
+  const detalhe = useQuery<CatalogSpellDetail>({
+    queryKey: ['spells', 'detail', id],
+    queryFn: () => spellsApi.show(id),
+    staleTime: Infinity,
+  });
+
+  return (
+    <View
+      style={{
+        paddingHorizontal: spacing.lg,
+        paddingBottom: spacing.md,
+        gap: spacing.sm,
+        backgroundColor: colors.surfaceHover,
+      }}
+    >
+      {detalhe.isPending ? (
+        <Loading />
+      ) : detalhe.isError ? (
+        <Text variant="small" tone="danger">
+          Não deu para carregar a magia.
+        </Text>
+      ) : (
+        <>
+          <View style={{ gap: spacing.xs }}>
+            <DetailRow label="Execução" value={detalhe.data.execution} />
+            <DetailRow label="Alcance" value={detalhe.data.range_text} />
+            <DetailRow label="Alvo" value={detalhe.data.target} />
+            <DetailRow label="Área" value={detalhe.data.area} />
+            <DetailRow label="Efeito" value={detalhe.data.effect} />
+            <DetailRow label="Duração" value={detalhe.data.duration} />
+            <DetailRow label="Resistência" value={detalhe.data.resistance} />
+          </View>
+
+          {detalhe.data.description ? (
+            <Text variant="small" tone="secondary">
+              {detalhe.data.description}
+            </Text>
+          ) : null}
+
+          {detalhe.data.enhancements.length > 0 ? (
+            <View style={{ gap: spacing.xs }}>
+              <Text variant="caption" tone="secondary" uppercase>
+                Aprimoramentos
+              </Text>
+              {detalhe.data.enhancements.map((aprimoramento, index) => (
+                <Text key={index} variant="small" tone="secondary">
+                  <Text variant="smallStrong" tone="arcane">
+                    {aprimoramento.cost}
+                  </Text>{' '}
+                  {aprimoramento.text}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+
+          {detalhe.data.source ? (
+            <Text variant="caption" tone="muted">
+              {detalhe.data.source}
+            </Text>
+          ) : null}
+        </>
+      )}
+    </View>
   );
 }

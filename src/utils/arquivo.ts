@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { apiFetchRaw } from '@/api';
+import { ApiError, apiFetchRaw } from '@/api';
 import type { AttachmentKind, NoteAttachment } from '@/api/types';
 import type { IconName } from '@/components/ui/Icon';
 
@@ -53,6 +53,19 @@ export class ArquivoGrandeDemaisError extends Error {
     super(`O arquivo tem ${formatarTamanho(bytes)} e o limite é 50 MB.`);
     this.name = 'ArquivoGrandeDemaisError';
   }
+}
+
+/**
+ * A frase que a tela mostra quando um envio falha.
+ *
+ * O servidor sabe dizer o que houve — o tamanho que aceita, o formato que não
+ * reconheceu, o teto de arquivos da anotação — e repetir isso é mais útil que
+ * um "falhou". Quando foi o próprio app que barrou o arquivo na escolha, a
+ * mensagem já vem pronta e nem chegou a haver requisição. O texto genérico
+ * cobre só o resto: queda de rede, erro inesperado.
+ */
+export function mensagemDoEnvio(falha: unknown, padrao = 'Não foi possível enviar o arquivo.'): string {
+  return falha instanceof ArquivoGrandeDemaisError || falha instanceof ApiError ? falha.message : padrao;
 }
 
 /**

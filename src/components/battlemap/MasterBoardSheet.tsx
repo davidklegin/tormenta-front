@@ -6,6 +6,7 @@ import { Button, Divider, Icon, Input, SegmentedControl, Sheet, Text } from '@/c
 import { useCampaignCharacters } from '@/hooks/useCampaigns';
 import { useStageItems } from '@/hooks/useStage';
 import { formDeImagem, prepararImagemParaUpload } from '@/utils/imagem';
+import { mensagemDoEnvio } from '@/utils/arquivo';
 import { radius, spacing, useTheme } from '@/theme';
 import type { BattleMapState } from '@/api/types';
 import type { useBattleMapControls } from '@/hooks/useBattleMap';
@@ -68,6 +69,7 @@ function AbaDoMapa({
   const [largura, setLargura] = useState(String(battleMap.grid?.width ?? 20));
   const [altura, setAltura] = useState(String(battleMap.grid?.height ?? 15));
   const [erro, setErro] = useState<string | null>(null);
+  const [erroFundo, setErroFundo] = useState<string | null>(null);
 
   /**
    * As caixas acompanham o tabuleiro quando ele muda por fora.
@@ -108,14 +110,31 @@ function AbaDoMapa({
     });
   };
 
+  /**
+   * O erro do envio precisa aparecer aqui.
+   *
+   * Sem isto a falha morria calada: o botão parava de girar e o mapa continuava
+   * o mesmo, sem uma linha dizendo por quê — e a causa costuma ser algo que só
+   * o servidor sabe (o tamanho que ele aceita, o formato). Quem escolheu a
+   * imagem ficava sem saber se tinha de tentar de novo ou trocar de arquivo.
+   */
   const escolherFundo = async () => {
-    const resultado = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    try {
+      const resultado = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
 
-    if (resultado.canceled || !resultado.assets[0]) return;
+      if (resultado.canceled || !resultado.assets[0]) return;
 
-    const imagem = await prepararImagemParaUpload(resultado.assets[0], 'mapa');
+      setErroFundo(null);
 
-    controles.enviarFundo.mutate(await formDeImagem('image', imagem));
+      const imagem = await prepararImagemParaUpload(resultado.assets[0], 'mapa');
+
+      controles.enviarFundo.mutate(await formDeImagem('image', imagem), {
+        onSuccess: () => setErroFundo(null),
+        onError: (falha) => setErroFundo(mensagemDoEnvio(falha, 'Não foi possível enviar a imagem.')),
+      });
+    } catch (falha) {
+      setErroFundo(mensagemDoEnvio(falha, 'Não foi possível enviar a imagem.'));
+    }
   };
 
   return (
@@ -160,6 +179,15 @@ function AbaDoMapa({
         loading={controles.enviarFundo.isPending}
         label={battleMap.background_url ? 'Trocar a imagem de fundo' : 'Escolher imagem de fundo'}
       />
+
+      {erroFundo && (
+        <>
+          <View style={{ height: spacing.xs }} />
+          <Text variant="small" tone="danger">
+            {erroFundo}
+          </Text>
+        </>
+      )}
 
       <View style={{ height: spacing.sm }} />
 

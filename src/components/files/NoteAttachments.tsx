@@ -4,12 +4,16 @@ import { Image } from 'expo-image';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { useMutation } from '@tanstack/react-query';
-import { ApiError } from '@/api';
 import type { NoteAttachment } from '@/api/types';
 import { Button, Icon, Text, iconSize } from '@/components/ui';
-import { ArquivoGrandeDemaisError, TAMANHO_MAXIMO_BYTES } from '@/utils/arquivo';
+import {
+  ArquivoGrandeDemaisError,
+  TAMANHO_MAXIMO_BYTES,
+  formatarTamanho,
+  iconeDoAnexo,
+  mensagemDoEnvio,
+} from '@/utils/arquivo';
 import { prepararImagemParaUpload } from '@/utils/imagem';
-import { formatarTamanho, iconeDoAnexo } from '@/utils/arquivo';
 import { radius, spacing, stroke, useTheme } from '@/theme';
 import { AttachmentViewer } from './AttachmentViewer';
 
@@ -178,12 +182,7 @@ export function NoteAttachments({
     // arquivos da anotação. Repetir isso é mais útil que um "falhou". Quando o
     // próprio app barrou o arquivo na escolha, a mensagem já vem pronta e nem
     // chega a haver requisição.
-    onError: (falha) =>
-      setErro(
-        falha instanceof ArquivoGrandeDemaisError || falha instanceof ApiError
-          ? falha.message
-          : 'Não foi possível enviar o arquivo.'
-      ),
+    onError: (falha) => setErro(mensagemDoEnvio(falha)),
   });
 
   const remover = useMutation({
