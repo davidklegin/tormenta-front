@@ -1186,6 +1186,10 @@ export type BattleMapGrid = {
   scale: number;
   offset_x: number;
   offset_y: number;
+  /** Cor das linhas, `#RRGGBB`. Nula: a do tema. */
+  color?: string | null;
+  /** Opacidade das linhas, de 0,05 a 1. Nula: a padrão. */
+  opacity?: number | null;
 };
 
 export type BattleMapState = {

@@ -8,6 +8,7 @@ import type {
   BattleMapToken,
   CharacterSummary,
   CombatEntry,
+  FogRegion,
   ReferenceCondition,
 } from '@/api/types';
 import { useConditionCatalog } from '../combat/ConditionBadges';
@@ -19,6 +20,8 @@ type Props = {
   tokens: BattleMapToken[];
   /** As áreas marcadas no chão — bola de fogo, cone de gelo, muralha. */
   areas: AreaEffect[];
+  /** As regiões de névoa, na ordem de `fog_regions`. */
+  nevoas: FogRegion[];
   /** A ordem de iniciativa, quando há combate. Vazia fora dele. */
   entries: CombatEntry[];
   /**
@@ -38,6 +41,9 @@ type Props = {
   onTamanho: (token: BattleMapToken, tamanho: number) => void;
   onRemover: (token: BattleMapToken) => void;
   onRemoverArea: (efeitoId: string) => void;
+  onRemoverNevoa: (indice: number) => void;
+  /** O mouse sobre a linha de uma névoa: o mapa acende a região. */
+  onDestacarNevoa?: (indice: number | null) => void;
   onAbrirCondicoes: (entry: CombatEntry) => void;
   onAbrirFicha: (entry: CombatEntry) => void;
 };
@@ -75,6 +81,7 @@ const TAMANHOS = [
 export function MasterTokenSidebar({
   tokens,
   areas,
+  nevoas,
   entries,
   fichas,
   conditions,
@@ -87,6 +94,8 @@ export function MasterTokenSidebar({
   onTamanho,
   onRemover,
   onRemoverArea,
+  onRemoverNevoa,
+  onDestacarNevoa,
   onAbrirCondicoes,
   onAbrirFicha,
 }: Props) {
@@ -171,6 +180,15 @@ export function MasterTokenSidebar({
             </Text>
           </>
         )}
+
+        {nevoas.length > 0 && (
+          <>
+            <View style={{ width: 12, height: 12, borderRadius: radius.sm, backgroundColor: '#000' }} />
+            <Text variant="caption" tone="secondary">
+              {nevoas.length}
+            </Text>
+          </>
+        )}
       </Pressable>
     );
   }
@@ -208,6 +226,7 @@ export function MasterTokenSidebar({
           <Text variant="smallStrong" tone="gold">
             {tokens.length} no tabuleiro
             {areas.length > 0 && ` · ${areas.length} área${areas.length > 1 ? 's' : ''}`}
+            {nevoas.length > 0 && ` · ${nevoas.length} névoa${nevoas.length > 1 ? 's' : ''}`}
           </Text>
         </View>
 
@@ -261,6 +280,28 @@ export function MasterTokenSidebar({
         {areas.length > 0 && <Secao rotulo="Áreas marcadas" />}
         {areas.map((area) => (
           <LinhaDaArea key={area.id} area={area} onRemover={() => onRemoverArea(area.id)} />
+        ))}
+
+        {/*
+          As névoas, uma a uma. Opaca, a névoa não mostra no mapa onde uma
+          região acaba e a vizinha começa; aqui cada uma tem nome pelos cantos,
+          e passar o mouse na linha acende a região no tabuleiro antes de ela
+          sair.
+        */}
+        {nevoas.length > 0 && <Secao rotulo="Névoas" />}
+        {nevoas.map((nevoa, indice) => (
+          <LinhaDaNevoa
+            // A névoa não tem id: é um polígono numa lista. A posição basta,
+            // porque a lista inteira é regravada a cada mudança.
+            key={`${indice}-${nevoa.points.map((p) => `${p.x},${p.y}`).join(';')}`}
+            numero={indice + 1}
+            nevoa={nevoa}
+            onRemover={() => {
+              onDestacarNevoa?.(null);
+              onRemoverNevoa(indice);
+            }}
+            onDestacar={(ligar) => onDestacarNevoa?.(ligar ? indice : null)}
+          />
         ))}
       </ScrollView>
 
@@ -571,6 +612,75 @@ function LinhaDaArea({ area, onRemover }: { area: AreaEffect; onRemover: () => v
         <Icon name="excluir" size={15} color={colors.danger} />
       </BotaoDaPeca>
     </View>
+  );
+}
+
+/**
+ * Uma região de névoa na lista, nomeada pelos quadrados dos cantos — "B3 → E7",
+ * do jeito que a mesa já fala do tabuleiro.
+ */
+function LinhaDaNevoa({
+  numero,
+  nevoa,
+  onRemover,
+  onDestacar,
+}: {
+  numero: number;
+  nevoa: FogRegion;
+  onRemover: () => void;
+  onDestacar: (ligar: boolean) => void;
+}) {
+  const { colors } = useTheme();
+
+  const xs = nevoa.points.map((p) => p.x);
+  const ys = nevoa.points.map((p) => p.y);
+  const canto = { x: Math.min(...xs), y: Math.min(...ys) };
+  // O polígono guarda a borda de fora; o último quadrado coberto é um antes.
+  const oposto = { x: Math.max(...xs) - 1, y: Math.max(...ys) - 1 };
+  const largura = oposto.x - canto.x + 1;
+  const altura = oposto.y - canto.y + 1;
+
+  const descricao = `${nomeDaCelula(canto)} → ${nomeDaCelula(oposto)}`;
+
+  return (
+    <Pressable
+      onHoverIn={() => onDestacar(true)}
+      onHoverOut={() => onDestacar(false)}
+      onPressIn={() => onDestacar(true)}
+      onPressOut={() => onDestacar(false)}
+      accessible={false}
+      style={({ hovered }: { hovered?: boolean }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.sm,
+        paddingHorizontal: spacing.sm,
+        paddingVertical: spacing.xs,
+        borderRadius: radius.sm,
+        backgroundColor: hovered ? colors.surfaceAlt : 'transparent',
+      })}
+    >
+      <View
+        style={{
+          width: 14,
+          height: 14,
+          borderRadius: radius.sm,
+          backgroundColor: '#000',
+        }}
+      />
+
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text variant="small" numberOfLines={1}>
+          Névoa {numero}
+        </Text>
+        <Text variant="caption" tone="muted" numberOfLines={1}>
+          {descricao} · {largura}×{altura}
+        </Text>
+      </View>
+
+      <BotaoDaPeca rotulo={`Remover a névoa ${numero} (${descricao})`} onPress={onRemover}>
+        <Icon name="excluir" size={15} color={colors.danger} />
+      </BotaoDaPeca>
+    </Pressable>
   );
 }
 

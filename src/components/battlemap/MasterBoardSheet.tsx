@@ -56,6 +56,100 @@ export function MasterBoardSheet({ visible, onClose, campaignId, battleMap, cont
   );
 }
 
+/** As cores oferecidas para as linhas: as que se leem sobre mapa claro e escuro. */
+const CORES_DA_GRADE: { valor: string | null; rotulo: string }[] = [
+  { valor: null, rotulo: 'Padrão do tema' },
+  { valor: '#000000', rotulo: 'Preto' },
+  { valor: '#FFFFFF', rotulo: 'Branco' },
+  { valor: '#E0B040', rotulo: 'Dourado' },
+  { valor: '#D03030', rotulo: 'Vermelho' },
+  { valor: '#3080E0', rotulo: 'Azul' },
+  { valor: '#40B060', rotulo: 'Verde' },
+  { valor: '#E040C0', rotulo: 'Magenta' },
+];
+
+const INTENSIDADES = [
+  { value: '0.35', label: 'Suave' },
+  { value: '0.6', label: 'Média' },
+  { value: '1', label: 'Forte' },
+];
+
+/**
+ * A cor das linhas do tabuleiro.
+ *
+ * Grava direto, sem passar pelo "Salvar o mapa": é uma escolha de olho, que se
+ * faz olhando o mapa mudar, e vale para a mesa inteira — TV e jogadores veem a
+ * mesma grade que o mestre.
+ */
+function CorDaGrade({
+  battleMap,
+  controles,
+}: {
+  battleMap: BattleMapState;
+  controles: Props['controles'];
+}) {
+  const { colors } = useTheme();
+
+  const cor = battleMap.grid?.color ?? null;
+  const opacidade = battleMap.grid?.opacity ?? 0.6;
+
+  // A intensidade gravada pode não ser uma das três; acende a mais próxima.
+  const intensidade = INTENSIDADES.reduce((perto, opcao) =>
+    Math.abs(Number(opcao.value) - opacidade) < Math.abs(Number(perto.value) - opacidade) ? opcao : perto
+  ).value;
+
+  const gravar = (grid_config: { color?: string | null; opacity?: number }) =>
+    controles.salvarMapa.mutate({ name: battleMap.name ?? 'Tabuleiro', grid_config });
+
+  return (
+    <View>
+      <Text variant="small" tone="muted">
+        Linhas da grade
+      </Text>
+      <View style={{ height: spacing.xs }} />
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+        {CORES_DA_GRADE.map((opcao) => {
+          const escolhida = opcao.valor === cor;
+
+          return (
+            <Pressable
+              key={opcao.rotulo}
+              onPress={() => gravar({ color: opcao.valor })}
+              accessibilityRole="button"
+              accessibilityLabel={`Linhas da grade: ${opcao.rotulo}`}
+              accessibilityState={{ selected: escolhida }}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: radius.sm,
+                borderWidth: escolhida ? 3 : 1,
+                borderColor: escolhida ? colors.primary : colors.border,
+                backgroundColor: opcao.valor ?? colors.surfaceAlt,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {opcao.valor === null && <Icon name="configuracoes" size={16} color={colors.textMuted} />}
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {cor !== null && (
+        <>
+          <View style={{ height: spacing.sm }} />
+          <SegmentedControl
+            segments={INTENSIDADES}
+            value={intensidade}
+            onChange={(valor) => gravar({ opacity: Number(valor) })}
+          />
+        </>
+      )}
+    </View>
+  );
+}
+
 function AbaDoMapa({
   battleMap,
   controles,
@@ -192,6 +286,10 @@ function AbaDoMapa({
       <View style={{ height: spacing.sm }} />
 
       <Button label="Salvar o mapa" onPress={salvar} loading={controles.salvarMapa.isPending} />
+
+      <Divider />
+
+      <CorDaGrade battleMap={battleMap} controles={controles} />
 
       <Divider />
 

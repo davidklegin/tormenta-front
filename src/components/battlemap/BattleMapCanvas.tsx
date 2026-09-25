@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Platform, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -8,19 +8,21 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { Text } from '@/components/ui';
+import { Icon, Text } from '@/components/ui';
 import { useTheme } from '@/theme';
 import type { BattleMapState, BattleMapToken, FogRegion } from '@/api/types';
 import { MapToken } from './MapToken';
 import {
   celulasDaArea,
   celulasDaNevoa,
+  corComOpacidade,
   distanciaEmMetros,
   formatarDistancia,
   METROS_POR_QUADRADO,
   nomeDaCelula,
   nomeDaColuna,
   nomeDaLinha,
+  pontoNoPoligono,
   retanguloComoPoligono,
   type Celula,
 } from './geometry';
@@ -40,6 +42,10 @@ type Props = {
   onSelecionarToken: (tokenId: number | null) => void;
   onMoverToken: (tokenId: number, x: number, y: number) => void;
   onPintarNevoa?: (regiao: FogRegion) => void;
+  /** Apaga a região de névoa nesta posição de `fog_regions`. */
+  onRemoverNevoa?: (indice: number) => void;
+  /** A névoa apontada fora do mapa — na lista da barra lateral. */
+  nevoaDestacada?: number | null;
   onMarcarArea?: (celula: Celula, direcaoEmGraus: number | null, alcance: number | null) => void;
   /** Tocar uma área já marcada a apaga — é como se desfaz o que se marcou. */
   onRemoverArea?: (efeitoId: string) => void;
@@ -57,6 +63,9 @@ type Props = {
 
 const ZOOM_MINIMO = 0.35;
 const ZOOM_MAXIMO = 3;
+
+/** Quanto cada clique nos botões de zoom aproxima ou afasta. */
+const PASSO_DO_ZOOM = 1.25;
 
 /**
  * Quanto o quadrado abre maior do que o estritamente necessário para o mapa
@@ -91,6 +100,8 @@ export function BattleMapCanvas({
   onSelecionarToken,
   onMoverToken,
   onPintarNevoa,
+  onRemoverNevoa,
+  nevoaDestacada = null,
   onMarcarArea,
   onRemoverArea,
   pedidoDeCentralizar = 0,
@@ -147,6 +158,12 @@ export function BattleMapCanvas({
   const [regua, setRegua] = useState<{ de: Celula; para: Celula } | null>(null);
   const [cantoDaNevoa, setCantoDaNevoa] = useState<Celula | null>(null);
 
+  // O quadrado sob o mouse, no modo Névoa. É o que acende a região que um
+  // clique (ou a tecla Delete) vai apagar — sem o destaque, o mestre clicaria
+  // às cegas numa névoa que, opaca, não mostra onde uma região acaba e a
+  // vizinha começa.
+  const [celulaSobOMouse, setCelulaSobOMouse] = useState<Celula | null>(null);
+
   /**
    * Trocar de ferramenta limpa o que a anterior deixou desenhado.
    *
@@ -159,6 +176,7 @@ export function BattleMapCanvas({
   useEffect(() => {
     setRegua(null);
     setCantoDaNevoa(null);
+    setCelulaSobOMouse(null);
   }, [modo]);
 
   /**
@@ -288,6 +306,92 @@ export function BattleMapCanvas({
     escala, escalaSalva, deslocX, deslocY, deslocSalvoX, deslocSalvoY,
   ]);
 
+  /**
+   * Aproxima ou afasta mantendo parado o ponto `foco` da tela.
+   *
+   * A pinça só existe onde há dois dedos; no computador, sem isto, o zoom do
+   * tabuleiro não tinha como ser alcançado. O ponto fixo é o que faz a roda do
+   * mouse parecer natural: o que está sob o cursor continua sob o cursor. Sem
+   * foco (os botões), o centro da janela.
+   *
+   * Parte dos valores salvos, e não dos animados: dois cliques seguidos nos
+   * botões chegam antes de a animação do primeiro acabar.
+   */
+  const aplicarZoom = useCallback(
+    (fator: number, foco?: { x: number; y: number }, animar = false) => {
+      const { largura, altura } = janela.current;
+      if (largura <= 0) return;
+
+      const focoX = foco?.x ?? largura / 2;
+      const focoY = foco?.y ?? altura / 2;
+
+      const atual = escalaSalva.value;
+      const proxima = Math.min(ZOOM_MAXIMO, Math.max(ZOOM_MINIMO, atual * fator));
+      if (proxima === atual) return;
+
+      const razao = proxima / atual;
+      const x = focoX - (focoX - deslocSalvoX.value) * razao;
+      const y = focoY - (focoY - deslocSalvoY.value) * razao;
+
+      escalaSalva.value = proxima;
+      deslocSalvoX.value = x;
+      deslocSalvoY.value = y;
+
+      if (animar) {
+        escala.value = withTiming(proxima, { duration: 140 });
+        deslocX.value = withTiming(x, { duration: 140 });
+        deslocY.value = withTiming(y, { duration: 140 });
+      } else {
+        escala.value = proxima;
+        deslocX.value = x;
+        deslocY.value = y;
+      }
+    },
+    [escala, escalaSalva, deslocX, deslocY, deslocSalvoX, deslocSalvoY]
+  );
+
+  // A roda do mouse, só na web. O ouvinte vai direto no elemento, com
+  // `passive: false`: é a única forma de o `preventDefault` segurar a página,
+  // que senão rolaria (ou, com Ctrl, daria zoom no navegador inteiro) junto.
+  const janelaRef = useRef<View>(null);
+  const aplicarZoomRef = useRef(aplicarZoom);
+  aplicarZoomRef.current = aplicarZoom;
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+
+    const elemento = janelaRef.current as unknown as HTMLElement | null;
+    if (!elemento?.addEventListener) return;
+
+    const girar = (evento: WheelEvent) => {
+      evento.preventDefault();
+
+      // Linhas e páginas viram pixels; a pinça do touchpad chega como roda com
+      // Ctrl e deltas bem menores, por isso ganha mais sensibilidade.
+      const unidade = evento.deltaMode === 1 ? 16 : evento.deltaMode === 2 ? 400 : 1;
+      const sensibilidade = evento.ctrlKey ? 0.01 : 0.0015;
+      const fator = Math.exp(-evento.deltaY * unidade * sensibilidade);
+
+      const caixa = elemento.getBoundingClientRect();
+      aplicarZoomRef.current(fator, {
+        x: evento.clientX - caixa.left,
+        y: evento.clientY - caixa.top,
+      });
+    };
+
+    // O `Hover` do gesture-handler não avisa quando o mouse sai do mapa para a
+    // barra ou a lista de peças, e a névoa apontada ficava acesa lá atrás.
+    const sair = () => setCelulaSobOMouse(null);
+
+    elemento.addEventListener('wheel', girar, { passive: false });
+    elemento.addEventListener('mouseleave', sair);
+
+    return () => {
+      elemento.removeEventListener('wheel', girar);
+      elemento.removeEventListener('mouseleave', sair);
+    };
+  }, [battleMap.id, grid === null]);
+
   /** Converte um toque na tela para o quadrado sob ele. */
   const celulaDoToque = useCallback(
     (telaX: number, telaY: number): Celula => ({
@@ -312,6 +416,20 @@ export function BattleMapCanvas({
       if (modo === 'area') return;
 
       if (modo === 'nevoa') {
+        // Tocar numa névoa já pintada a apaga, como no modo Área. Só no
+        // primeiro toque: com um canto já marcado, o segundo toque fecha o
+        // retângulo mesmo que caia em cima de outra névoa.
+        if (cantoDaNevoa === null) {
+          const indice = regiaoDaNevoaEm(battleMap.fog_regions, celula);
+
+          if (indice !== null) {
+            onRemoverNevoa?.(indice);
+            setCelulaSobOMouse(null);
+
+            return;
+          }
+        }
+
         // Dois toques fecham um retângulo: no celular, desenhar polígono com
         // vértices é um gesto que não se acerta com o polegar.
         if (cantoDaNevoa === null) {
@@ -369,11 +487,13 @@ export function BattleMapCanvas({
       somenteLeitura,
       battleMap.tokens,
       battleMap.area_effects,
+      battleMap.fog_regions,
       cantoDaNevoa,
       tokenSelecionado,
       podeMover,
       onMarcarArea,
       onPintarNevoa,
+      onRemoverNevoa,
       onMoverToken,
       onSelecionarToken,
     ]
@@ -582,6 +702,23 @@ export function BattleMapCanvas({
     [tocarNoTabuleiro]
   );
 
+  // O mouse passando por cima do mapa, no modo Névoa. Só a célula atravessa
+  // para o JS, e só quando muda — não um setState por pixel.
+  const pairar = useMemo(
+    () =>
+      Gesture.Hover()
+        .onUpdate((evento) => {
+          runOnJS(setCelulaSobOMouse)({
+            x: Math.floor((evento.x - deslocX.value) / escala.value / lado),
+            y: Math.floor((evento.y - deslocY.value) / escala.value / lado),
+          });
+        })
+        .onFinalize(() => {
+          runOnJS(setCelulaSobOMouse)(null);
+        }),
+    [deslocX, deslocY, escala, lado]
+  );
+
   const gestos = useMemo(
     () =>
       // Medir e Área trabalham com o mesmo gesto de esticar uma linha, e o
@@ -589,8 +726,10 @@ export function BattleMapCanvas({
       // o arrasto e nenhuma das duas ferramentas respondia.
       modo === 'medir' || modo === 'area'
         ? Gesture.Simultaneous(pinca, reguaGesto)
-        : Gesture.Simultaneous(pinca, arrastar, toque),
-    [modo, pinca, reguaGesto, arrastar, toque]
+        : modo === 'nevoa'
+          ? Gesture.Simultaneous(pinca, arrastar, toque, pairar)
+          : Gesture.Simultaneous(pinca, arrastar, toque),
+    [modo, pinca, reguaGesto, arrastar, toque, pairar]
   );
 
   const estiloDoMundo = useAnimatedStyle(() => ({
@@ -605,6 +744,62 @@ export function BattleMapCanvas({
     () => celulasDaNevoa(battleMap.fog_regions, colunas, linhas),
     [battleMap.fog_regions, colunas, linhas]
   );
+
+  // A região que o mouse aponta — a que sai com um clique ou com Delete.
+  const indiceSobOMouse = useMemo(
+    () =>
+      modo === 'nevoa' && cantoDaNevoa === null && celulaSobOMouse
+        ? regiaoDaNevoaEm(battleMap.fog_regions, celulaSobOMouse)
+        : null,
+    [modo, cantoDaNevoa, celulaSobOMouse, battleMap.fog_regions]
+  );
+
+  const contornoSobOMouse = useMemo(() => {
+    const indice = nevoaDestacada ?? indiceSobOMouse;
+    const regiao = indice === null ? undefined : battleMap.fog_regions[indice];
+    if (!regiao || regiao.points.length === 0) return null;
+
+    const xs = regiao.points.map((p) => p.x);
+    const ys = regiao.points.map((p) => p.y);
+    const x1 = Math.max(0, Math.min(...xs));
+    const y1 = Math.max(0, Math.min(...ys));
+    const x2 = Math.min(colunas, Math.max(...xs));
+    const y2 = Math.min(linhas, Math.max(...ys));
+
+    return { x: x1, y: y1, largura: x2 - x1, altura: y2 - y1 };
+  }, [nevoaDestacada, indiceSobOMouse, battleMap.fog_regions, colunas, linhas]);
+
+  // Delete ou Backspace com o mouse sobre a névoa: apagar sem precisar mirar
+  // o clique, e o mesmo gesto de apagar que o resto do computador usa.
+  const apagarSobOMouse = useRef<(() => void) | null>(null);
+  apagarSobOMouse.current =
+    indiceSobOMouse === null || !onRemoverNevoa
+      ? null
+      : () => {
+          onRemoverNevoa(indiceSobOMouse);
+          setCelulaSobOMouse(null);
+        };
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || modo !== 'nevoa') return;
+
+    const tecla = (evento: KeyboardEvent) => {
+      if (evento.key !== 'Delete' && evento.key !== 'Backspace') return;
+
+      // Digitando num campo, Backspace é apagar letra, não névoa.
+      const alvo = evento.target as HTMLElement | null;
+      if (alvo && (alvo.tagName === 'INPUT' || alvo.tagName === 'TEXTAREA' || alvo.isContentEditable)) return;
+
+      if (apagarSobOMouse.current) {
+        evento.preventDefault();
+        apagarSobOMouse.current();
+      }
+    };
+
+    window.addEventListener('keydown', tecla);
+
+    return () => window.removeEventListener('keydown', tecla);
+  }, [modo]);
 
   const areas = useMemo(
     () =>
@@ -625,10 +820,16 @@ export function BattleMapCanvas({
     );
   }
 
-  const corDaGrade = isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.14)';
+  // A cor que o mestre escolheu no painel vale para a mesa inteira — TV e
+  // jogadores inclusive. Sem escolha, a do tema.
+  const corDaGrade = grid.color
+    ? corComOpacidade(grid.color, grid.opacity ?? 0.6)
+    : isDark
+      ? 'rgba(255,255,255,0.16)'
+      : 'rgba(0,0,0,0.14)';
 
   return (
-    <View style={[styles.janela, { backgroundColor: colors.bg }]} onLayout={enquadrar}>
+    <View ref={janelaRef} style={[styles.janela, { backgroundColor: colors.bg }]} onLayout={enquadrar}>
       <GestureDetector gesture={gestos}>
         <Animated.View style={styles.janela}>
           <Animated.View
@@ -672,8 +873,6 @@ export function BattleMapCanvas({
               </View>
             ))}
 
-            <Grade colunas={colunas} linhas={linhas} lado={lado} cor={corDaGrade} />
-
             {/* As coordenadas vêm logo depois da grade, e não por cima de tudo:
                 a peça precisa cobrir o rótulo do quadrado onde ela está — e
                 quando ela está lá, ninguém precisa do rótulo. Por isso as
@@ -691,19 +890,38 @@ export function BattleMapCanvas({
                     position: 'absolute',
                     left: celula.x * lado,
                     top: celula.y * lado,
-                    width: lado,
-                    height: lado,
                     // Preto, e não a cor de fundo do tema: no Pergaminho o
                     // fundo é bege claro, e a névoa sumia por cima de um mapa
                     // também claro. O que a névoa representa é escuridão.
-                    backgroundColor: '#0b0a09',
-                    // Para o mestre ela é translúcida: ele precisa enxergar o
-                    // que cobriu para saber o que revelar em seguida.
-                    opacity: ehMestre ? 0.55 : 0.97,
+                    //
+                    // Opaca para todos, o mestre inclusive. Translúcida para
+                    // ele, o mapa vazava sempre que a tela do mestre ia para a
+                    // mesa — compartilhada na chamada, espelhada na TV. Um
+                    // pixel a mais de largura cobre a costura entre quadrados,
+                    // que o arredondamento do zoom deixava como uma grade clara.
+                    backgroundColor: '#000',
+                    width: lado + 1,
+                    height: lado + 1,
                   }}
                 />
               ))}
             </View>
+
+            {contornoSobOMouse && (
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: contornoSobOMouse.x * lado,
+                  top: contornoSobOMouse.y * lado,
+                  width: contornoSobOMouse.largura * lado,
+                  height: contornoSobOMouse.altura * lado,
+                  borderWidth: 3,
+                  borderColor: colors.danger,
+                  backgroundColor: 'rgba(200,40,40,0.18)',
+                }}
+              />
+            )}
 
             {cantoDaNevoa && (
               <View
@@ -740,6 +958,11 @@ export function BattleMapCanvas({
             ))}
             </View>
 
+            {/* A grade vem por cima do fundo, da névoa e das peças: num mapa
+                desenhado, com as próprias linhas e sombras, a grade embaixo
+                sumia na imagem, e o mestre não via onde um quadrado acabava. */}
+            <Grade colunas={colunas} linhas={linhas} lado={lado} cor={corDaGrade} />
+
             {regua && <Regua regua={regua} lado={lado} cor={colors.accent} />}
           </Animated.View>
         </Animated.View>
@@ -768,11 +991,68 @@ export function BattleMapCanvas({
           <Text variant="caption" tone="muted">
             {cantoDaNevoa
               ? `Canto em ${nomeDaCelula(cantoDaNevoa)}. Toque no canto oposto.`
-              : 'Toque num canto da área a cobrir.'}
+              : indiceSobOMouse !== null
+                ? 'Clique (ou Delete) para remover esta névoa.'
+                : 'Toque num canto da área a cobrir, ou numa névoa para removê-la.'}
           </Text>
         </View>
       )}
+
+      {/* Fora do GestureDetector: dentro dele, o toque no botão também
+          chegaria ao tabuleiro como toque no mapa. */}
+      <View style={styles.zoom}>
+        <BotaoDeZoom
+          icone="mais"
+          rotulo="Aproximar"
+          onPress={() => aplicarZoom(PASSO_DO_ZOOM, undefined, true)}
+        />
+        <BotaoDeZoom
+          icone="menos"
+          rotulo="Afastar"
+          onPress={() => aplicarZoom(1 / PASSO_DO_ZOOM, undefined, true)}
+        />
+      </View>
     </View>
+  );
+}
+
+/** A região de névoa que cobre o quadrado — a de cima, se houver duas. */
+function regiaoDaNevoaEm(regioes: FogRegion[], celula: Celula): number | null {
+  for (let i = regioes.length - 1; i >= 0; i--) {
+    const regiao = regioes[i];
+
+    if (regiao && pontoNoPoligono(celula.x + 0.5, celula.y + 0.5, regiao.points)) return i;
+  }
+
+  return null;
+}
+
+function BotaoDeZoom({
+  icone,
+  rotulo,
+  onPress,
+}: {
+  icone: 'mais' | 'menos';
+  rotulo: string;
+  onPress: () => void;
+}) {
+  const { colors } = useTheme();
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={rotulo}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.botaoDeZoom,
+        {
+          backgroundColor: pressed ? colors.surfaceAlt : colors.surface,
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      <Icon name={icone} size={20} color={colors.text} />
+    </Pressable>
   );
 }
 
@@ -1006,6 +1286,22 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  // No alto, e não embaixo: o canto de baixo à direita é onde a pastilha de
+  // PV/PM flutua, e a faixa de baixo é da leitura da régua e da dica.
+  zoom: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+    gap: 6,
+  },
+  botaoDeZoom: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dica: {
     position: 'absolute',

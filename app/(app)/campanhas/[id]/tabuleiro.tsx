@@ -66,6 +66,8 @@ export default function TabuleiroScreen() {
 
   const [modo, setModo] = useState<ModoDoTabuleiro>('navegar');
   const [selecionado, setSelecionado] = useState<number | null>(null);
+  // A névoa sob o mouse na lista da barra lateral, acesa também no mapa.
+  const [nevoaDestacada, setNevoaDestacada] = useState<number | null>(null);
   const [painelAberto, setPainelAberto] = useState(false);
   const [pedidoDeCentralizar, setPedidoDeCentralizar] = useState(0);
 
@@ -407,6 +409,7 @@ export default function TabuleiroScreen() {
           <MasterTokenSidebar
             tokens={mapa.tokens ?? []}
             areas={mapa.area_effects ?? []}
+            nevoas={mapa.fog_regions ?? []}
             entries={ordem?.entries ?? []}
             fichas={fichasDaMesa.data ?? []}
             conditions={condicoesDoLivro}
@@ -432,6 +435,10 @@ export default function TabuleiroScreen() {
               setSelecionado(null);
             }}
             onRemoverArea={(efeitoId) => controles.removerArea.mutate(efeitoId)}
+            onRemoverNevoa={(indice) =>
+              controles.salvarNevoa.mutate((mapa.fog_regions ?? []).filter((_, i) => i !== indice))
+            }
+            onDestacarNevoa={setNevoaDestacada}
             onAbrirCondicoes={(entry) => setCondicoesDe(entry.id)}
             onAbrirFicha={(entry) => setFichaDe(entry.id)}
           />
@@ -450,6 +457,10 @@ export default function TabuleiroScreen() {
               onPintarNevoa={(regiao) =>
                 controles.salvarNevoa.mutate([...(mapa.fog_regions ?? []), regiao])
               }
+              onRemoverNevoa={(indice) =>
+                controles.salvarNevoa.mutate((mapa.fog_regions ?? []).filter((_, i) => i !== indice))
+              }
+              nevoaDestacada={nevoaDestacada}
               onMarcarArea={aoMarcarArea}
               onRemoverArea={(efeitoId) => controles.removerArea.mutate(efeitoId)}
               pedidoDeCentralizar={pedidoDeCentralizar}

@@ -3,7 +3,13 @@ import type { AreaEffect, BattleMapState, Envelope, FogRegion, TokenEntityType }
 
 export type BattleMapUpdateInput = {
   name: string;
-  grid_config?: { scale?: number; offset_x?: number; offset_y?: number };
+  grid_config?: {
+    scale?: number;
+    offset_x?: number;
+    offset_y?: number;
+    color?: string | null;
+    opacity?: number | null;
+  };
   width_squares?: number;
   height_squares?: number;
   state?: 'preparing' | 'active' | 'paused';

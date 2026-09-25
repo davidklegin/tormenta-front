@@ -202,6 +202,15 @@ export function alcanceEmMetros(efeito: AreaEffect): number | null {
   return quadrados * METROS_POR_QUADRADO;
 }
 
+/** `#RRGGBB` com opacidade, no formato que o estilo aceita. */
+export function corComOpacidade(hex: string, opacidade: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+
+  return `rgba(${r},${g},${b},${opacidade})`;
+}
+
 /** Converte um par de cantos em polígono de quatro pontos, para a névoa. */
 export function retanguloComoPoligono(a: Celula, b: Celula): FogRegion {
   const x1 = Math.min(a.x, b.x);
