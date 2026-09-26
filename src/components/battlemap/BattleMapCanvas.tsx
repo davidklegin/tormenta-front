@@ -249,13 +249,34 @@ export function BattleMapCanvas({
     [battleMap.tokens, lado]
   );
 
+  // O mapa que já foi enquadrado, pelas medidas. Enquanto for o mesmo, uma
+  // mudança de tamanho da janela não mexe no zoom de quem está jogando.
+  const enquadrado = useRef<string | null>(null);
+
   const enquadrar = useCallback(
     (evento: LayoutChangeEvent) => {
       const { width, height } = evento.nativeEvent.layout;
+      const anterior = janela.current;
 
       janela.current = { largura: width, altura: height };
 
       if (width <= 0 || larguraMapa <= 0) return;
+
+      // Selecionar uma peça abre a barra dela embaixo do mapa, e a janela
+      // encolhe. Reenquadrar ali jogava fora o zoom a cada clique numa peça;
+      // agora só o centro acompanha a janela, e o zoom fica onde estava. A TV
+      // não tem quem dê zoom nela, então segue enquadrando sempre.
+      const medidas = `${larguraMapa}x${alturaMapa}`;
+      if (!somenteLeitura && enquadrado.current === medidas && anterior.largura > 0) {
+        deslocX.value += (width - anterior.largura) / 2;
+        deslocY.value += (height - anterior.altura) / 2;
+        deslocSalvoX.value = deslocX.value;
+        deslocSalvoY.value = deslocY.value;
+
+        return;
+      }
+
+      enquadrado.current = medidas;
 
       // Abre com o mapa à vista, e um pouco maior que o exato — ver
       // `AMPLIACAO_DA_GRADE`. Entrar no tabuleiro com o zoom em 1 mostraria um
@@ -272,7 +293,7 @@ export function BattleMapCanvas({
       deslocSalvoY.value = deslocY.value;
     },
     [
-      larguraMapa, alturaMapa, zoomDeAbertura, ampliacao,
+      larguraMapa, alturaMapa, zoomDeAbertura, ampliacao, somenteLeitura,
       escala, escalaSalva, deslocX, deslocY, deslocSalvoX, deslocSalvoY,
     ]
   );
