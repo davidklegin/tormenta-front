@@ -947,6 +947,8 @@ export type CampaignSession = {
 export type CombatCondition = {
   id: string;
   key: string;
+  /** Só nos efeitos inventados no painel de efeitos em grupo, que não têm verbete no catálogo. */
+  name?: string | null;
   duration: number | null;
   applied_at_round: number;
   applied_by_entry_id: string | null;

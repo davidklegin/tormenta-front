@@ -5,7 +5,7 @@ import { combatApi, type CombatBuffInput } from '@/api';
 import type { ReferenceCondition } from '@/api/types';
 import { Button, Card, Chip, Icon, Input, Loading, Sheet, Text } from '@/components/ui';
 import { useReference } from '@/hooks/useReference';
-import { useCombat } from '@/hooks/useCombat';
+import { combatKeys, useCombat } from '@/hooks/useCombat';
 import { radius, spacing, useTheme } from '@/theme';
 import { contemTermo, normalizar } from '@/utils/texto';
 
@@ -68,6 +68,9 @@ export function CombatBuffPanel({ campaignId }: { campaignId: number }) {
       setSelectedCondition(null);
       // Invalidar queries de condições dos personagens se necessário
       queryClient.invalidateQueries({ queryKey: ['characters'] });
+      // O efeito agora também entra na ordem do combate, que é o que a fila,
+      // a ficha do NPC e o mapa mostram.
+      queryClient.invalidateQueries({ queryKey: combatKeys.state(campaignId) });
     },
   });
 

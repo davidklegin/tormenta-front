@@ -37,7 +37,9 @@ export function useConditionCatalog(conditions: ReferenceCondition[] | undefined
  * Resolve a aparência de uma condição.
  *
  * Fora do catálogo (uma chave antiga guardada num combate salvo, por exemplo)
- * a condição ainda aparece: some o nome bonito, não o marcador.
+ * a condição ainda aparece: some o nome bonito, não o marcador. O efeito
+ * inventado no painel de efeitos em grupo traz o próprio `nome`, e vai no tom
+ * leve — é um "Bênção", e não uma condição grave desconhecida.
  */
 export function useConditionLook() {
   const { colors } = useTheme();
@@ -49,10 +51,14 @@ export function useConditionLook() {
       pesada: { fill: colors.primaryFill, ink: colors.primaryInk },
     };
 
-    return (key: string, catalogo: Map<string, ReferenceCondition>): ConditionLook => {
+    return (
+      key: string,
+      catalogo: Map<string, ReferenceCondition>,
+      nomeProprio?: string | null
+    ): ConditionLook => {
       const oficial = catalogo.get(key);
-      const nome = oficial?.name ?? formatarChave(key);
-      const severidade = oficial?.severity ?? 3;
+      const nome = oficial?.name ?? nomeProprio ?? formatarChave(key);
+      const severidade = oficial?.severity ?? (nomeProprio ? 1 : 3);
 
       // Incapacitante é sempre o tom mais forte: perder o turno não é um
       // detalhe de grau, e o mestre precisa achar isso na lista de relance.
@@ -103,7 +109,7 @@ export function ConditionBadges({ conditions, catalog, compact = false, onRemove
   return (
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 2, marginTop: 2 }}>
       {conditions.map((condition) => {
-        const look = resolver(condition.key, catalog);
+        const look = resolver(condition.key, catalog, condition.name);
         const conteudo = (
           <View
             style={{
