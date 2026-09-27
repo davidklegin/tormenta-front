@@ -64,9 +64,10 @@ const FOLGA_DA_TELA = 140;
  * deixa o mestre agir sobre elas sem sair do mapa: dano, condição e correção
  * de ordem estão todos a um toque da mesma lista.
  *
- * O que cada pessoa vê é diferente. O mestre lê o PV de todo mundo; o jogador
- * lê o das próprias fichas e, dos NPCs, só as condições — que são marcadores
- * que o mestre pendurou justamente para a mesa ver.
+ * O que cada pessoa vê é diferente. O mestre lê o PV e o PM de todo mundo; o
+ * jogador lê os das próprias fichas, o PV dos companheiros — "quem precisa de
+ * cura?" é pergunta do grupo inteiro — e, dos NPCs, só as condições, que são
+ * marcadores que o mestre pendurou justamente para a mesa ver.
  */
 export function CombatSidebar({
   combat,
@@ -137,6 +138,9 @@ export function CombatSidebar({
 
   const podeVerVitais = (entry: CombatEntry) =>
     isMaster || (entry.character_id !== null && minhasFichas.includes(entry.character_id));
+
+  // O PV de um companheiro é da mesa; o PM dele, e tudo dos NPCs, não.
+  const podeVerVida = (entry: CombatEntry) => podeVerVitais(entry) || !entry.is_npc;
 
   const alternarGrupo = (chave: string) =>
     setExpandidos((atual) => {
@@ -311,7 +315,8 @@ export function CombatSidebar({
                       ativa={indice === combat.turn_index}
                       proxima={indice === (combat.turn_index + 1) % combat.entries.length}
                       selecionada={selecionada === entry.id}
-                      mostrarVitais={podeVerVitais(entry)}
+                      mostrarVitais={podeVerVida(entry)}
+                      soVida={!podeVerVitais(entry)}
                       catalogo={catalogo}
                       compacto={compacto}
                       onPress={() => {
@@ -525,6 +530,7 @@ function LinhaDeCombatente({
   proxima,
   selecionada,
   mostrarVitais,
+  soVida,
   catalogo,
   compacto,
   onPress,
@@ -535,6 +541,7 @@ function LinhaDeCombatente({
   proxima: boolean;
   selecionada: boolean;
   mostrarVitais: boolean;
+  soVida: boolean;
   catalogo: Map<string, ReferenceCondition>;
   compacto: boolean;
   onPress: () => void;
@@ -600,7 +607,7 @@ function LinhaDeCombatente({
           {entry.initiative}
         </Text>
 
-        {mostrarVitais && <Vitais entry={entry} compacto={compacto} />}
+        {mostrarVitais && <Vitais entry={entry} compacto={compacto} soVida={soVida} />}
       </View>
     </Pressable>
   );
@@ -666,7 +673,16 @@ function Retrato({
   );
 }
 
-function Vitais({ entry, compacto }: { entry: CombatEntry; compacto: boolean }) {
+/** PV (e PM, fora do `soVida`) de um combatente. A TV usa o mesmo, só com o PV. */
+export function Vitais({
+  entry,
+  compacto,
+  soVida = false,
+}: {
+  entry: CombatEntry;
+  compacto: boolean;
+  soVida?: boolean;
+}) {
   const { colors } = useTheme();
 
   // Nada a mostrar quando a entrada não tem vitais: "0/0" é pior que o silêncio,
@@ -703,7 +719,7 @@ function Vitais({ entry, compacto }: { entry: CombatEntry; compacto: boolean }) 
         )}
       </View>
 
-      {entry.current_mp !== null && entry.max_mp !== null && entry.max_mp > 0 && (
+      {!soVida && entry.current_mp !== null && entry.max_mp !== null && entry.max_mp > 0 && (
         <Text variant="caption" tone="arcane">
           {entry.current_mp}
           {!compacto && `/${entry.max_mp}`}

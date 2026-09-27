@@ -4,6 +4,7 @@ import type { CombatState } from '@/api/types';
 import { Text } from '@/components/ui';
 import { radius, spacing, stroke, useTheme } from '@/theme';
 import { AlcaDeAmpliar, useAmpliacao } from './ampliacao';
+import { Vitais } from './CombatSidebar';
 
 /** Largura do quadro no tamanho de sempre. */
 const LARGURA = 260;
@@ -33,12 +34,16 @@ const TETO_DA_MESA = 3;
  *
  * `ampliavel` acrescenta a alça do canto. Vale onde alguém pode chegar perto do
  * aparelho e ajustar — a TV da sala —, e não onde o quadro é só passagem.
+ *
+ * `mostrarVida` põe o PV dos personagens dos jogadores ao lado da iniciativa. O
+ * dos NPCs fica de fora: quanto falta para o ogro cair é do mestre.
  */
 export function InitiativeTracker({
   combat,
   compacto = false,
   ampliavel = false,
   dica = true,
+  mostrarVida = false,
 }: {
   combat: CombatState;
   compacto?: boolean;
@@ -47,6 +52,8 @@ export function InitiativeTracker({
   /** O convite escrito na alça. Some junto com a barra da TV, onde ninguém
       deve ficar lendo instrução a noite inteira. */
   dica?: boolean;
+  /** O PV dos personagens dos jogadores, na linha de cada um. */
+  mostrarVida?: boolean;
 }) {
   const { colors, elevation } = useTheme();
 
@@ -138,6 +145,10 @@ export function InitiativeTracker({
                 <Text variant="caption" tone={agora ? 'gold' : 'muted'}>
                   {entrada.initiative}
                 </Text>
+
+                {mostrarVida && !entrada.is_npc ? (
+                  <Vitais entry={entrada} compacto={compacto} soVida />
+                ) : null}
               </View>
             );
           })}

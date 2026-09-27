@@ -129,6 +129,7 @@ export default function TabuleiroTvScreen() {
             compacto={isPhone}
             ampliavel
             dica={barraVisivel}
+            mostrarVida
           />
         </View>
       ) : null}
