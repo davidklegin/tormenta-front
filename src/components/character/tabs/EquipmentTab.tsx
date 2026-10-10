@@ -16,6 +16,7 @@ import {
   Sheet,
   Text,
 } from '@/components/ui';
+import { TreasuryCard } from '@/components/campaign/TreasuryCard';
 import { ShowcaseButton } from '@/components/showcase';
 import { useReference } from '@/hooks/useReference';
 import { describeCatalogItem, formatSlots, formatTibar } from '@/rules';
@@ -138,6 +139,10 @@ export function EquipmentContent({ characterId, character }: { characterId: numb
           </View>
         </View>
       </Card>
+
+      {/* O cofre da mesa ao lado da bolsa do personagem: é aqui que se decide
+          quanto tirar de um para o outro. */}
+      {character.campaign ? <TreasuryCard campaignId={character.campaign.id} /> : null}
 
       {canEdit ? (
         <Button

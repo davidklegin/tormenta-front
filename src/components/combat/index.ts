@@ -7,3 +7,4 @@ export { InitiativeTracker } from './InitiativeTracker';
 export { NPCStatSheet } from './NPCStatSheet';
 export { TurnAlertOverlay } from './TurnAlertOverlay';
 export { acharEntradaDoToken } from './vinculo';
+export { RetratoAmpliado } from './RetratoAmpliado';

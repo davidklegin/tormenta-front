@@ -17,6 +17,7 @@ import {
   CombatSidebar,
   ConditionPicker,
   NPCStatSheet,
+  RetratoAmpliado,
 } from '@/components/combat';
 import { useCampaignCharacters } from '@/hooks/useCampaigns';
 import { useBattleMap, useBattleMapControls, useMoveToken, useUndoToken } from '@/hooks/useBattleMap';
@@ -114,6 +115,25 @@ export default function TabuleiroScreen() {
   */
   const [fichaAberta, setFichaAberta] = useState<number | null>(null);
 
+  // O rosto de uma criatura, ampliado. Guardado como nome e imagem, e não como
+  // entrada: a peça do mapa também abre, e nem toda peça tem linha na ordem.
+  const [retrato, setRetrato] = useState<{ nome: string; imagem: string | null } | null>(null);
+
+  /*
+    Qualquer ficha da mesa abre por cima do mapa, e não só as próprias — pedido
+    de 2026-10-10 ("se eu conseguisse abrir a ficha de todos"). A leitura já era
+    aberta aos colegas (CharacterPolicy::view); quem não é dono recebe a ficha
+    com `can_update` falso, e as abas se desenham em modo leitura. A lista vai
+    inteira para o seletor do painel, com as próprias na frente.
+  */
+  const fichasParaAbrir = useMemo(
+    () =>
+      [...(fichasDaMesa.data ?? [])]
+        .sort((a, b) => Number(b.is_owner) - Number(a.is_owner))
+        .map((ficha) => ({ id: ficha.id, name: ficha.name })),
+    [fichasDaMesa.data]
+  );
+
   // O catálogo de condições é a fonte dos nomes dos marcadores. Vem para todos:
   // o jogador também vê que o goblin está caído.
   const referencia = useReference();
@@ -159,6 +179,26 @@ export default function TabuleiroScreen() {
 
     return tokenSelecionado.entity_id !== null && minhasFichas.includes(tokenSelecionado.entity_id);
   }, [tokenSelecionado, ehMestre, minhasFichas]);
+
+  /*
+    O jogador que toca numa criatura no mapa quer saber quem ela é — mexer nela
+    ele não pode. A peça continua selecionada, como antes, e o rosto abre.
+    O mestre segue só selecionando: para ele o toque é o começo de um arrasto.
+  */
+  const aoSelecionarToken = useCallback(
+    (tokenId: number | null) => {
+      setSelecionado(tokenId);
+
+      if (ehMestre || tokenId === null) return;
+
+      const peca = mapa?.tokens.find((t) => t.id === tokenId);
+
+      if (peca && peca.entity_type !== 'player_character') {
+        setRetrato({ nome: peca.name, imagem: peca.image_url });
+      }
+    },
+    [ehMestre, mapa?.tokens]
+  );
 
   const aoMover = useCallback(
     (tokenId: number, x: number, y: number) => mover.mutate({ tokenId, x, y }),
@@ -452,7 +492,7 @@ export default function TabuleiroScreen() {
               ehMestre={ehMestre}
               modo={modo}
               tokenSelecionado={selecionado}
-              onSelecionarToken={setSelecionado}
+              onSelecionarToken={aoSelecionarToken}
               onMoverToken={aoMover}
               onPintarNevoa={(regiao) =>
                 controles.salvarNevoa.mutate([...(mapa.fog_regions ?? []), regiao])
@@ -499,13 +539,19 @@ export default function TabuleiroScreen() {
                 onReorder={(ids) => combatControls.reordenar.mutate(ids)}
                 onOpenConditions={(entry) => setCondicoesDe(entry.id)}
                 onRemoveCondition={aoRemoverCondicao}
+                onOpenPortrait={(entry) => setRetrato({ nome: entry.name, imagem: entry.avatar_url })}
                 onOpenSheet={(entry) => {
-                  /* A linha de uma ficha desta pessoa abre a ficha dela; as
-                     outras seguem para a ficha da criatura, que é do mestre.
-                     Antes, tocar na própria linha não fazia nada — o toque já
-                     chegava aqui e morria na condição de mestre lá embaixo. */
-                  if (entry.character_id !== null && minhasFichas.includes(entry.character_id)) {
+                  /* A linha de um personagem abre a ficha dele, seja de quem
+                     for. A de uma criatura abre a ficha do NPC para o mestre;
+                     para o jogador, que não pode lê-la, o rosto ampliado. */
+                  if (entry.character_id !== null) {
                     setFichaAberta(entry.character_id);
+
+                    return;
+                  }
+
+                  if (!ehMestre) {
+                    setRetrato({ nome: entry.name, imagem: entry.avatar_url });
 
                     return;
                   }
@@ -630,10 +676,14 @@ export default function TabuleiroScreen() {
         <CharacterSheetModal
           visible
           characterId={fichaAberta}
-          fichas={minhas.map((ficha) => ({ id: ficha.id, name: ficha.name }))}
+          fichas={fichasParaAbrir}
           onTrocarFicha={setFichaAberta}
           onClose={() => setFichaAberta(null)}
         />
+      )}
+
+      {retrato && (
+        <RetratoAmpliado nome={retrato.nome} imagem={retrato.imagem} onClose={() => setRetrato(null)} />
       )}
 
       {ehMestre && mapa && (

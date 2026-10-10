@@ -19,6 +19,7 @@ import {
   Text,
 } from '@/components/ui';
 import { CharacterCard } from '@/components/character/CharacterCard';
+import { TreasuryCard } from '@/components/campaign/TreasuryCard';
 import { PageHeader, ResponsiveGrid } from '@/components/layout';
 import {
   useCampaign,
@@ -168,6 +169,10 @@ export default function CampaignScreen() {
       {/* O tabuleiro, pelo mesmo motivo do palco: é da sessão ao vivo, e só
           quem senta à mesa alcança. */}
       {data.is_member ? <TabuleiroDaSessao campaignId={campaignId} /> : null}
+
+      {/* O cofre do grupo: o mesmo saldo para a mesa inteira. Só de quem senta
+          à mesa — para o visitante, o servidor responde 403. */}
+      {data.is_member ? <TreasuryCard campaignId={campaignId} /> : null}
 
       {/* Anotações em destaque: é o que a mesa mais consulta entre as sessões,
           então mostra o conteúdo, e não só um botão para outro lugar. */}

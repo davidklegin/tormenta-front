@@ -969,6 +969,8 @@ export type CombatEntry = {
   current_mp: number | null;
   max_mp: number | null;
   temp_hp: number;
+  /** Defesa calculada da ficha; só nos personagens. */
+  defense?: number | null;
   conditions: CombatCondition[];
 };
 
@@ -1213,4 +1215,21 @@ export type BattleMapState = {
    */
   is_master_view: boolean;
   updated_at: string | null;
+};
+
+/** Uma entrada (positiva) ou saída (negativa) do cofre do grupo, em T$. */
+export type CampaignTreasuryEntry = {
+  id: number;
+  /** Decimal em texto, como o Laravel o serializa: "150.50", "-25.00". */
+  amount: string;
+  description: string | null;
+  user: { id: number; name: string } | null;
+  created_at: string | null;
+  can_delete: boolean;
+};
+
+/** O cofre do grupo: o saldo é a soma de todas as movimentações. */
+export type CampaignTreasury = {
+  balance: string;
+  entries: CampaignTreasuryEntry[];
 };

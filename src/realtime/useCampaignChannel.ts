@@ -153,6 +153,13 @@ export function useCampaignChannel(campaignId: number | null | undefined, enable
         queryClient.setQueryData<StageState>(['stage', campaignId], event);
       });
 
+      // O cofre do grupo: o evento traz só o saldo, e a tela pede o histórico
+      // de novo — quem guardou e quanto é o que a mesa quer ler em seguida.
+      channel.listen('.campaign.treasury.updated', () => {
+        markEventReceived();
+        queryClient.invalidateQueries({ queryKey: ['campaign-treasury', campaignId] });
+      });
+
       // A ordem de iniciativa: como o palco, o evento traz o estado inteiro.
       channel.listen('.combat.updated', (event: CombatState) => {
         markEventReceived();

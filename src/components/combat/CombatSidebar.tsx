@@ -14,7 +14,7 @@ type Props = {
   isMaster: boolean;
   conditions: ReferenceCondition[];
   compacto?: boolean;
-  /** Fichas desta pessoa: definem de quem ela pode ver e mexer nos vitais. */
+  /** Fichas desta pessoa. */
   minhasFichas?: number[];
   onNextTurn?: () => void;
   onPreviousTurn?: () => void;
@@ -25,6 +25,8 @@ type Props = {
   onOpenConditions?: (entry: CombatEntry) => void;
   onRemoveCondition?: (entry: CombatEntry, condition: CombatCondition) => void;
   onOpenSheet?: (entry: CombatEntry) => void;
+  /** Toque no rosto de uma criatura: o retrato ampliado, para qualquer um. */
+  onOpenPortrait?: (entry: CombatEntry) => void;
 };
 
 /**
@@ -64,10 +66,11 @@ const FOLGA_DA_TELA = 140;
  * deixa o mestre agir sobre elas sem sair do mapa: dano, condição e correção
  * de ordem estão todos a um toque da mesma lista.
  *
- * O que cada pessoa vê é diferente. O mestre lê o PV e o PM de todo mundo; o
- * jogador lê os das próprias fichas, o PV dos companheiros — "quem precisa de
- * cura?" é pergunta do grupo inteiro — e, dos NPCs, só as condições, que são
- * marcadores que o mestre pendurou justamente para a mesa ver.
+ * O que cada pessoa vê é diferente. Defesa, PV e PM dos personagens ficam à
+ * vista da mesa inteira — pedido de 2026-10-10, "para todos irem monitorando",
+ * e coerente com a ficha, que os colegas já leem. Dos NPCs, o jogador vê só as
+ * condições, que são marcadores que o mestre pendurou justamente para a mesa
+ * ver, e o rosto, que abre ampliado ao toque.
  */
 export function CombatSidebar({
   combat,
@@ -83,6 +86,7 @@ export function CombatSidebar({
   onOpenConditions,
   onRemoveCondition,
   onOpenSheet,
+  onOpenPortrait,
 }: Props) {
   const { colors, elevation } = useTheme();
 
@@ -136,11 +140,7 @@ export function CombatSidebar({
 
   if (!combat.active || combat.entries.length === 0) return null;
 
-  const podeVerVitais = (entry: CombatEntry) =>
-    isMaster || (entry.character_id !== null && minhasFichas.includes(entry.character_id));
-
-  // O PV de um companheiro é da mesa; o PM dele, e tudo dos NPCs, não.
-  const podeVerVida = (entry: CombatEntry) => podeVerVitais(entry) || !entry.is_npc;
+  const podeVerVitais = (entry: CombatEntry) => isMaster || !entry.is_npc;
 
   const alternarGrupo = (chave: string) =>
     setExpandidos((atual) => {
@@ -315,10 +315,12 @@ export function CombatSidebar({
                       ativa={indice === combat.turn_index}
                       proxima={indice === (combat.turn_index + 1) % combat.entries.length}
                       selecionada={selecionada === entry.id}
-                      mostrarVitais={podeVerVida(entry)}
-                      soVida={!podeVerVitais(entry)}
+                      mostrarVitais={podeVerVitais(entry)}
                       catalogo={catalogo}
                       compacto={compacto}
+                      onRetrato={
+                        entry.is_npc && onOpenPortrait ? () => onOpenPortrait(entry) : undefined
+                      }
                       onPress={() => {
                         if (!isMaster) {
                           onOpenSheet?.(entry);
@@ -375,11 +377,10 @@ export function CombatSidebar({
               <Icon name="condicao" size={15} color={colors.textMuted} />
             </BotaoDeBarra>
 
-            {entradaSelecionada.is_npc && (
-              <BotaoDeBarra rotulo="Ver ficha" onPress={() => onOpenSheet?.(entradaSelecionada)}>
-                <Icon name="mestre" size={15} color={colors.textMuted} />
-              </BotaoDeBarra>
-            )}
+            {/* Do NPC, a ficha da criatura; do personagem, a ficha dele em leitura. */}
+            <BotaoDeBarra rotulo="Ver ficha" onPress={() => onOpenSheet?.(entradaSelecionada)}>
+              <Icon name={entradaSelecionada.is_npc ? 'mestre' : 'perfil'} size={15} color={colors.textMuted} />
+            </BotaoDeBarra>
           </View>
 
           {/*
@@ -530,10 +531,10 @@ function LinhaDeCombatente({
   proxima,
   selecionada,
   mostrarVitais,
-  soVida,
   catalogo,
   compacto,
   onPress,
+  onRetrato,
   onRemoveCondition,
 }: {
   entry: CombatEntry;
@@ -541,10 +542,10 @@ function LinhaDeCombatente({
   proxima: boolean;
   selecionada: boolean;
   mostrarVitais: boolean;
-  soVida: boolean;
   catalogo: Map<string, ReferenceCondition>;
   compacto: boolean;
   onPress: () => void;
+  onRetrato?: () => void;
   onRemoveCondition?: (condition: CombatCondition) => void;
 }) {
   const { colors } = useTheme();
@@ -580,7 +581,18 @@ function LinhaDeCombatente({
         borderLeftColor: ativa ? colors.accent : colors.border,
       })}
     >
-      <Retrato entry={entry} tamanho={ativa ? 30 : 22} caido={caido} />
+      {onRetrato ? (
+        <Pressable
+          onPress={onRetrato}
+          hitSlop={4}
+          accessibilityRole="button"
+          accessibilityLabel={`Ver o rosto de ${entry.name}`}
+        >
+          <Retrato entry={entry} tamanho={ativa ? 30 : 22} caido={caido} />
+        </Pressable>
+      ) : (
+        <Retrato entry={entry} tamanho={ativa ? 30 : 22} caido={caido} />
+      )}
 
       <View style={{ flex: 1, minWidth: 0 }}>
         <Text
@@ -592,6 +604,8 @@ function LinhaDeCombatente({
           {entry.name}
         </Text>
 
+        {mostrarVitais && <Vitais entry={entry} compacto={compacto} />}
+
         {(entry.conditions?.length ?? 0) > 0 && (
           <ConditionBadges
             conditions={entry.conditions ?? []}
@@ -602,13 +616,9 @@ function LinhaDeCombatente({
         )}
       </View>
 
-      <View style={{ alignItems: 'flex-end' }}>
-        <Text variant="caption" tone={ativa ? 'gold' : 'muted'}>
-          {entry.initiative}
-        </Text>
-
-        {mostrarVitais && <Vitais entry={entry} compacto={compacto} soVida={soVida} />}
-      </View>
+      <Text variant="caption" tone={ativa ? 'gold' : 'muted'}>
+        {entry.initiative}
+      </Text>
     </Pressable>
   );
 }
@@ -673,7 +683,7 @@ function Retrato({
   );
 }
 
-/** PV (e PM, fora do `soVida`) de um combatente. A TV usa o mesmo, só com o PV. */
+/** Defesa, PV e PM de um combatente. A TV usa o mesmo, só com o PV (`soVida`). */
 export function Vitais({
   entry,
   compacto,
@@ -699,9 +709,23 @@ export function Vitais({
           ? colors.warningInk
           : colors.dangerInk;
 
+  /*
+    Embaixo do nome, e com rótulo. Quando eram só o PV do jogador, dois números
+    soltos no canto bastavam; com a Defesa, o PV e o PM de toda a mesa, três
+    números sem nome viram adivinhação — e a mesa é de quem está começando.
+  */
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs }}>
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', columnGap: spacing.sm }}>
+      {!soVida && entry.defense != null && (
+        <Text variant="caption" tone="muted">
+          Def {entry.defense}
+        </Text>
+      )}
+
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 1 }}>
+        <Text variant="caption" tone="muted">
+          PV{' '}
+        </Text>
         <Text variant="caption" style={{ color: corDoPv }}>
           {entry.current_hp}
         </Text>
@@ -721,7 +745,7 @@ export function Vitais({
 
       {!soVida && entry.current_mp !== null && entry.max_mp !== null && entry.max_mp > 0 && (
         <Text variant="caption" tone="arcane">
-          {entry.current_mp}
+          PM {entry.current_mp}
           {!compacto && `/${entry.max_mp}`}
         </Text>
       )}
