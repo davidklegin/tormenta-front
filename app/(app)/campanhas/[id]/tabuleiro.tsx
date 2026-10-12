@@ -6,6 +6,7 @@ import { Chip, ErrorState, Icon, Loading, Screen, Text } from '@/components/ui';
 import {
   BattleMapCanvas,
   BattleMapToolbar,
+  MapCalibrator,
   MasterBoardSheet,
   MasterTokenSidebar,
   nomeDaCelula,
@@ -70,6 +71,7 @@ export default function TabuleiroScreen() {
   // A névoa sob o mouse na lista da barra lateral, acesa também no mapa.
   const [nevoaDestacada, setNevoaDestacada] = useState<number | null>(null);
   const [painelAberto, setPainelAberto] = useState(false);
+  const [alinhando, setAlinhando] = useState(false);
   const [pedidoDeCentralizar, setPedidoDeCentralizar] = useState(0);
 
   // A lista de peças nasce aberta no desktop e recolhida no celular, onde ela
@@ -693,7 +695,15 @@ export default function TabuleiroScreen() {
           campaignId={campaignId}
           battleMap={mapa}
           controles={controles}
+          onAlinhar={() => {
+            setPainelAberto(false);
+            setAlinhando(true);
+          }}
         />
+      )}
+
+      {ehMestre && mapa?.id && alinhando && (
+        <MapCalibrator battleMap={mapa} controles={controles} onClose={() => setAlinhando(false)} />
       )}
     </View>
   );

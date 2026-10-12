@@ -12,6 +12,7 @@ import { Icon, Text } from '@/components/ui';
 import { useTheme } from '@/theme';
 import type { BattleMapState, BattleMapToken, FogRegion } from '@/api/types';
 import { MapToken } from './MapToken';
+import { posicaoDaImagem } from './alinhamento';
 import {
   celulasDaArea,
   celulasDaNevoa,
@@ -866,13 +867,29 @@ export function BattleMapCanvas({
               // sobre ela — arrastar o mapa, esticar a régua e pegar uma peça
               // param de funcionar no instante em que um mapa é carregado, e
               // continuam funcionando enquanto o fundo está vazio.
-              <Image
-                pointerEvents="none"
-                source={{ uri: battleMap.background_url }}
-                style={StyleSheet.absoluteFill}
-                contentFit="cover"
-                transition={150}
-              />
+              //
+              // Alinhada, a imagem é desenhada na escala que o mestre mediu
+              // (ver `MapCalibrator`), e o que passar da grade é cortado. Sem
+              // alinhamento, esticada sobre a grade inteira, como sempre foi.
+              grid.image ? (
+                <View pointerEvents="none" style={[StyleSheet.absoluteFill, { overflow: 'hidden' }]}>
+                  <Image
+                    pointerEvents="none"
+                    source={{ uri: battleMap.background_url }}
+                    style={{ position: 'absolute', ...posicaoDaImagem(grid.image, lado) }}
+                    contentFit="fill"
+                    transition={150}
+                  />
+                </View>
+              ) : (
+                <Image
+                  pointerEvents="none"
+                  source={{ uri: battleMap.background_url }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  transition={150}
+                />
+              )
             )}
 
             {areas.map(({ efeito, celulas }) => (

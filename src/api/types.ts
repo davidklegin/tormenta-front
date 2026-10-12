@@ -1194,6 +1194,27 @@ export type BattleMapGrid = {
   color?: string | null;
   /** Opacidade das linhas, de 0,05 a 1. Nula: a padrão. */
   opacity?: number | null;
+  /** Tamanho da imagem de fundo em pixels, quando o servidor conseguiu ler. */
+  image_width?: number | null;
+  image_height?: number | null;
+  /** Onde a imagem cai sobre a grade. Nulo: esticada para cobri-la. */
+  image?: BattleMapImageAlignment | null;
+};
+
+/**
+ * A imagem de fundo presa à grade, em pixels da imagem original.
+ *
+ * `square_*` é quantos pixels da imagem cabem num quadrado; `origin_*` é o
+ * ponto da imagem onde fica o canto de cima à esquerda do quadrado A1 — pode
+ * ser negativo ou fracionário.
+ */
+export type BattleMapImageAlignment = {
+  width: number;
+  height: number;
+  square_width: number;
+  square_height: number;
+  origin_x: number;
+  origin_y: number;
 };
 
 export type BattleMapState = {

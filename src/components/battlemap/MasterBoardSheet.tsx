@@ -11,6 +11,7 @@ import { radius, spacing, useTheme } from '@/theme';
 import type { BattleMapState } from '@/api/types';
 import type { useBattleMapControls } from '@/hooks/useBattleMap';
 import { nomeDaForma } from './geometry';
+import { formatarPixels } from './alinhamento';
 
 type Props = {
   visible: boolean;
@@ -18,6 +19,8 @@ type Props = {
   campaignId: number;
   battleMap: BattleMapState;
   controles: ReturnType<typeof useBattleMapControls>;
+  /** Abre a tela de alinhar a grade à imagem de fundo. */
+  onAlinhar: () => void;
 };
 
 type Aba = 'mapa' | 'pecas';
@@ -30,7 +33,7 @@ type Aba = 'mapa' | 'pecas';
  * inteira é o mapa — abrir isto é um gesto deliberado, não algo em que se
  * esbarra ao arrastar uma peça.
  */
-export function MasterBoardSheet({ visible, onClose, campaignId, battleMap, controles }: Props) {
+export function MasterBoardSheet({ visible, onClose, campaignId, battleMap, controles, onAlinhar }: Props) {
   const { colors } = useTheme();
   const [aba, setAba] = useState<Aba>('mapa');
 
@@ -48,7 +51,7 @@ export function MasterBoardSheet({ visible, onClose, campaignId, battleMap, cont
       <View style={{ height: spacing.md }} />
 
       {aba === 'mapa' ? (
-        <AbaDoMapa battleMap={battleMap} controles={controles} />
+        <AbaDoMapa battleMap={battleMap} controles={controles} onAlinhar={onAlinhar} />
       ) : (
         <AbaDasPecas campaignId={campaignId} battleMap={battleMap} controles={controles} />
       )}
@@ -153,9 +156,11 @@ function CorDaGrade({
 function AbaDoMapa({
   battleMap,
   controles,
+  onAlinhar,
 }: {
   battleMap: BattleMapState;
   controles: Props['controles'];
+  onAlinhar: () => void;
 }) {
   const { colors } = useTheme();
 
@@ -223,7 +228,14 @@ function AbaDoMapa({
       const imagem = await prepararImagemParaUpload(resultado.assets[0], 'mapa');
 
       controles.enviarFundo.mutate(await formDeImagem('image', imagem), {
-        onSuccess: () => setErroFundo(null),
+        // A imagem nova chega esticada sobre a grade, e quase nunca é isso que
+        // o desenho pede. Ir direto para o alinhamento poupa o mestre de
+        // descobrir o desencontro já com o grupo em cima do mapa; "Cancelar"
+        // ali mantém a imagem esticada.
+        onSuccess: () => {
+          setErroFundo(null);
+          onAlinhar();
+        },
         onError: (falha) => setErroFundo(mensagemDoEnvio(falha, 'Não foi possível enviar a imagem.')),
       });
     } catch (falha) {
@@ -279,6 +291,22 @@ function AbaDoMapa({
           <View style={{ height: spacing.xs }} />
           <Text variant="small" tone="danger">
             {erroFundo}
+          </Text>
+        </>
+      )}
+
+      {battleMap.background_url && (
+        <>
+          <View style={{ height: spacing.sm }} />
+          <Button
+            variant={battleMap.grid?.image ? 'secondary' : 'gold'}
+            onPress={onAlinhar}
+            label="Alinhar a grade à imagem"
+          />
+          <Text variant="caption" tone="muted" center style={{ marginTop: spacing.xxs }}>
+            {battleMap.grid?.image
+              ? `Alinhada: 1 quadrado = ${formatarPixels(battleMap.grid.image.square_width)} da imagem.`
+              : 'A imagem está esticada sobre a grade. Alinhe para os corredores caírem nos quadrados.'}
           </Text>
         </>
       )}

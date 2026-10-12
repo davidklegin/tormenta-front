@@ -9,6 +9,12 @@ export type BattleMapUpdateInput = {
     offset_y?: number;
     color?: string | null;
     opacity?: number | null;
+    image_width?: number | null;
+    image_height?: number | null;
+    image_square_width?: number | null;
+    image_square_height?: number | null;
+    image_origin_x?: number | null;
+    image_origin_y?: number | null;
   };
   width_squares?: number;
   height_squares?: number;

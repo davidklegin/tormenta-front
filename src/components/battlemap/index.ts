@@ -1,5 +1,6 @@
 export { BattleMapCanvas, type ModoDoTabuleiro } from './BattleMapCanvas';
 export { BattleMapToolbar } from './BattleMapToolbar';
+export { MapCalibrator } from './MapCalibrator';
 export { MasterBoardSheet } from './MasterBoardSheet';
 export { MasterTokenSidebar } from './MasterTokenSidebar';
 export {
