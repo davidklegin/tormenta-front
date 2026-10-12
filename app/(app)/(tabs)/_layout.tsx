@@ -6,7 +6,7 @@ import { fontFamily, fontSize, hitSize, spacing, stroke, useResponsive, useTheme
 /**
  * Navegação principal.
  *
- * Três destinos apenas — bem abaixo do limite de cinco que uma barra inferior
+ * Quatro destinos — abaixo do limite de cinco que uma barra inferior
  * comporta sem virar adivinhação. Cada um tem ícone **e** rótulo: ícone sozinho
  * obriga o usuário a decorar o que cada símbolo significa.
  *
@@ -16,6 +16,8 @@ import { fontFamily, fontSize, hitSize, spacing, stroke, useResponsive, useTheme
 const TABS: { name: string; title: string; icon: IconName }[] = [
   { name: 'personagens', title: 'Personagens', icon: 'personagens' },
   { name: 'campanhas', title: 'Campanhas', icon: 'campanhas' },
+  // Itens da mesa com bônus: o mestre e os jogadores forjam aqui.
+  { name: 'forja', title: 'Forja', icon: 'forja' },
   { name: 'perfil', title: 'Perfil', icon: 'perfil' },
 ];
 

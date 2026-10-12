@@ -1,6 +1,7 @@
 import { RefreshControl, View } from 'react-native';
 import {
   BackButton,
+  Button,
   Divider,
   ErrorState,
   Loading,
@@ -14,10 +15,11 @@ import { useAuthStore } from '@/store/auth';
 import { useVitalsStore } from '@/store/vitals';
 import { SHEET_TABS } from '@/rules';
 import { spacing, useTheme } from '@/theme';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'expo-router';
 import type { Character } from '@/api/types';
 import { CharacterHeader } from './CharacterHeader';
+import { LevelUpSheet } from './LevelUpSheet';
 import { SheetTabs } from './SheetTabs';
 
 /**
@@ -50,6 +52,8 @@ export function SheetScreen({
       escolherNoMarcador(characterId);
     }
   }, [meuId, donoDaFicha, characterId, escolherNoMarcador]);
+
+  const [subindo, setSubindo] = useState(false);
 
   const segmento = pathname.split('/').pop() ?? 'index';
   const aba = SHEET_TABS.find((tab) => tab.key === segmento) ?? SHEET_TABS[0];
@@ -89,6 +93,21 @@ export function SheetScreen({
       </View>
 
       <CharacterHeader character={character} />
+
+      {/* Só o dono sobe a ficha, como só o dono a edita. Fica à vista em
+          todas as abas porque subir de nível é o momento em que a pessoa
+          mais precisa de ajuda com a ficha — e não deveria ter de saber que
+          a resposta mora na tela de edição. */}
+      {character.permissions.can_update && character.level < 20 ? (
+        <Button
+          label={`Subir para o ${character.level + 1}º nível`}
+          variant="gold"
+          size="sm"
+          onPress={() => setSubindo(true)}
+          style={{ alignSelf: 'flex-start' }}
+        />
+      ) : null}
+
       <Divider />
 
       <View style={{ gap: spacing.space2 }}>
@@ -100,6 +119,10 @@ export function SheetScreen({
       </View>
 
       {children(character)}
+
+      {character.permissions.can_update ? (
+        <LevelUpSheet visible={subindo} onClose={() => setSubindo(false)} character={character} />
+      ) : null}
     </Screen>
   );
 }

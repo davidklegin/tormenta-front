@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Button, Chip, Text } from '@/components/ui';
 import type { Character } from '@/api/types';
 import { radius, spacing, stroke, useResponsive, useTheme } from '@/theme';
+import { ATTRIBUTE_LABELS } from '@/rules';
 import { AttributeGrid } from './AttributeGrid';
 
 /**
@@ -109,10 +110,12 @@ export function CharacterStats({ character }: { character: Character }) {
   return (
     <View style={{ flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' }}>
       <StatTile label="Defesa" value={character.defense.total} highlight />
-      <StatTile label="Deslocamento" value={`${character.displacement.effective}m`} />
-      {character.spellcasting.total !== null ? (
-        <StatTile label="CD de magia" value={character.spellcasting.total} />
+      {/* A CD logo depois da Defesa: são os dois números que o mestre pede
+          na mesa — um para acertar o personagem, outro para resistir a ele. */}
+      {character.ability_dc.total !== null ? (
+        <StatTile label={rotuloDaCd(character)} value={character.ability_dc.total} />
       ) : null}
+      <StatTile label="Deslocamento" value={`${character.displacement.effective}m`} />
       {character.damage_reduction.total > 0 ? (
         <StatTile label="RD" value={character.damage_reduction.total} />
       ) : null}
@@ -121,6 +124,18 @@ export function CharacterStats({ character }: { character: Character }) {
       ) : null}
     </View>
   );
+}
+
+/**
+ * "CD de magia" para quem conjura; para os demais, a CD com o atributo-chave
+ * ("CD For"), porque cada habilidade cita o seu atributo e o número só vale
+ * para as que citam esse.
+ */
+export function rotuloDaCd(character: Character): string {
+  const { source, attribute } = character.ability_dc;
+
+  if (source === 'spell') return 'CD de magia';
+  return attribute ? `CD ${ATTRIBUTE_LABELS[attribute].short}` : 'CD';
 }
 
 /** Moldura das faixas do cabeçalho: rótulo em versalete e o valor embaixo. */

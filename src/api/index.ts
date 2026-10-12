@@ -20,6 +20,7 @@ export {
 } from './endpoints/battlemap';
 export { campaignsApi } from './endpoints/campaigns';
 export { charactersApi } from './endpoints/characters';
+export { forgeApi } from './endpoints/forge';
 export { treasuryApi } from './endpoints/treasury';
 export {
   combatApi,

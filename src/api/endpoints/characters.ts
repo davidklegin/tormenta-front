@@ -1,5 +1,6 @@
 import { apiRequest, apiUpload } from '../client';
 import type {
+  AttributeKey,
   Character,
   CharacterAttack,
   CharacterClassAbility,
@@ -13,6 +14,8 @@ import type {
   CharacterSpell,
   CharacterSummary,
   Envelope,
+  LevelUpPreview,
+  LevelUpResult,
   NoteAttachment,
   Vitals,
 } from '../types';
@@ -93,6 +96,18 @@ export const charactersApi = {
       method: 'POST',
       body: { quality },
     }),
+
+  // --- subir de nível ---
+  levelUpPreview: (id: number, gameClassId: number, attribute?: AttributeKey | null) =>
+    apiRequest<Envelope<LevelUpPreview>>(`/characters/${id}/level-up`, {
+      query: { game_class_id: gameClassId, ...(attribute ? { attribute } : {}) },
+    }).then((r) => r.data),
+
+  levelUp: (id: number, gameClassId: number, attribute?: AttributeKey | null) =>
+    apiRequest<Envelope<LevelUpResult>>(`/characters/${id}/level-up`, {
+      method: 'POST',
+      body: { game_class_id: gameClassId, ...(attribute ? { attribute } : {}) },
+    }).then((r) => r.data),
 
   history: (id: number) =>
     apiRequest<{ data: unknown[] }>(`/characters/${id}/vitals/history`).then((r) => r.data),

@@ -32,6 +32,7 @@ export function AttributeGrid({ attributes }: { attributes: CharacterAttribute[]
           attribute.racial !== 0 ? `raça ${signed(attribute.racial)}` : null,
           attribute.bonus !== 0 ? `bônus ${signed(attribute.bonus)}` : null,
           attribute.temp !== 0 ? `temp ${signed(attribute.temp)}` : null,
+          attribute.items ? `itens ${signed(attribute.items)}` : null,
         ].filter(Boolean);
 
         return (

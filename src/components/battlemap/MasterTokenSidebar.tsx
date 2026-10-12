@@ -279,7 +279,12 @@ export function MasterTokenSidebar({
         */}
         {areas.length > 0 && <Secao rotulo="Áreas marcadas" />}
         {areas.map((area) => (
-          <LinhaDaArea key={area.id} area={area} onRemover={() => onRemoverArea(area.id)} />
+          <LinhaDaArea
+            key={area.id}
+            area={area}
+            peca={area.token_id === undefined ? null : (tokens.find((t) => t.id === area.token_id) ?? null)}
+            onRemover={() => onRemoverArea(area.id)}
+          />
         ))}
 
         {/*
@@ -566,8 +571,31 @@ function LinhaDaPeca({
  * — "Esfera" e "Esfera" são duas linhas iguais —, e a cor com a posição é o que
  * deixa a pessoa apontar no chão qual delas ela está prestes a apagar.
  */
-function LinhaDaArea({ area, onRemover }: { area: AreaEffect; onRemover: () => void }) {
+function LinhaDaArea({
+  area,
+  peca,
+  onRemover,
+}: {
+  area: AreaEffect;
+  /** A peça a que a área está presa, se estiver. */
+  peca: BattleMapToken | null;
+  onRemover: () => void;
+}) {
   const { colors } = useTheme();
+
+  // Onde ela está, e o que a faz mudar: a peça que ela segue e a contagem de
+  // rodadas — com o nome de quem age quando a contagem anda, porque é a
+  // pergunta que o mestre faz ao passar o turno ("a nuvem é de quem?").
+  const detalhes = [
+    peca ? `segue ${peca.name}` : `em ${nomeDaCelula(area)}`,
+    area.duration === undefined
+      ? null
+      : `${area.duration === 1 ? '1 rodada' : `${area.duration} rodadas`}${
+          area.applied_by_name ? ` (turno de ${area.applied_by_name})` : ''
+        }`,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 
   const alcance = alcanceEmMetros(area);
   const descricao = [
@@ -603,8 +631,8 @@ function LinhaDaArea({ area, onRemover }: { area: AreaEffect; onRemover: () => v
         <Text variant="small" numberOfLines={1}>
           {descricao}
         </Text>
-        <Text variant="caption" tone="muted">
-          em {area.x}, {area.y}
+        <Text variant="caption" tone="muted" numberOfLines={2}>
+          {detalhes}
         </Text>
       </View>
 

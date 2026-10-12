@@ -96,7 +96,12 @@ export function celulasDaNevoa(regioes: FogRegion[], largura: number, altura: nu
  * métrica e a régua usasse outra, o jogador mediria 9 m até a borda de uma
  * bola de fogo de 6 m e continuaria pintado de vermelho.
  */
-export function celulasDaArea(efeito: AreaEffect, largura: number, altura: number): Celula[] {
+export function celulasDaArea(
+  efeito: AreaEffect,
+  largura: number,
+  altura: number,
+  pegada?: Pegada | null
+): Celula[] {
   const celulas: Celula[] = [];
   const origem = { x: efeito.x, y: efeito.y };
 
@@ -105,9 +110,19 @@ export function celulasDaArea(efeito: AreaEffect, largura: number, altura: numbe
   if (efeito.shape === 'circle') {
     const raio = efeito.radius ?? 0;
 
-    for (let y = Math.floor(origem.y - raio); y <= Math.ceil(origem.y + raio); y++) {
-      for (let x = Math.floor(origem.x - raio); x <= Math.ceil(origem.x + raio); x++) {
-        if (cabe(x, y) && Math.abs(x - origem.x) + Math.abs(y - origem.y) <= raio) {
+    // A esfera presa a uma peça é uma aura: mede-se da borda da peça, e não
+    // de um quadrado só dela. Num dragão 2×2, medir do canto de cima daria
+    // uma aura torta, maior de um lado que do outro. Para a peça de um
+    // quadrado, as duas contas dão o mesmo losango.
+    const base = pegada ?? { x: origem.x, y: origem.y, size: 1 };
+    const fim = { x: base.x + base.size - 1, y: base.y + base.size - 1 };
+
+    for (let y = Math.floor(base.y - raio); y <= Math.ceil(fim.y + raio); y++) {
+      for (let x = Math.floor(base.x - raio); x <= Math.ceil(fim.x + raio); x++) {
+        const dx = x < base.x ? base.x - x : x > fim.x ? x - fim.x : 0;
+        const dy = y < base.y ? base.y - y : y > fim.y ? y - fim.y : 0;
+
+        if (cabe(x, y) && dx + dy <= raio) {
           celulas.push({ x, y });
         }
       }
@@ -175,6 +190,63 @@ export function celulasDaArea(efeito: AreaEffect, largura: number, altura: numbe
   }
 
   return celulas;
+}
+
+/** Onde uma peça está e quantos quadrados ela ocupa de lado. */
+export type Pegada = { x: number; y: number; size: number };
+
+/**
+ * Até onde a peça chega daqui, com uma e com duas ações de movimento.
+ *
+ * Devolve cada quadrado que a peça pode passar a ocupar, marcado 1 (chega com
+ * uma ação de movimento) ou 2 (precisa das duas — a ação padrão trocada por
+ * outro movimento). A conta é a da régua: diagonal custa 3 m.
+ *
+ * Para peça grande, o que anda é o canto de cima; o quadrado fica marcado se
+ * alguma posição alcançável da peça o cobre. Um ogro 2×2 que anda 9 m chega a
+ * ocupar quadrados a 10,5 m do canto de onde saiu, e o sombreado diz isso.
+ */
+export function celulasAoAlcance(
+  pegada: Pegada,
+  metros: number,
+  largura: number,
+  altura: number
+): Map<string, 1 | 2> {
+  const alcance = new Map<string, 1 | 2>();
+  const passos = Math.floor(metros / METROS_POR_QUADRADO);
+
+  if (passos <= 0) return alcance;
+
+  const longe = passos * 2;
+  const ultimaColuna = largura - pegada.size;
+  const ultimaLinha = altura - pegada.size;
+
+  for (let ay = Math.max(0, pegada.y - longe); ay <= Math.min(ultimaLinha, pegada.y + longe); ay++) {
+    for (let ax = Math.max(0, pegada.x - longe); ax <= Math.min(ultimaColuna, pegada.x + longe); ax++) {
+      const custo = Math.abs(ax - pegada.x) + Math.abs(ay - pegada.y);
+      if (custo === 0 || custo > longe) continue;
+
+      const faixa: 1 | 2 = custo <= passos ? 1 : 2;
+
+      for (let y = ay; y < ay + pegada.size; y++) {
+        for (let x = ax; x < ax + pegada.size; x++) {
+          const chave = `${x},${y}`;
+          const atual = alcance.get(chave);
+
+          if (atual === undefined || faixa < atual) alcance.set(chave, faixa);
+        }
+      }
+    }
+  }
+
+  // A própria peça não é destino: sombreá-la só esconderia o retrato.
+  for (let y = pegada.y; y < pegada.y + pegada.size; y++) {
+    for (let x = pegada.x; x < pegada.x + pegada.size; x++) {
+      alcance.delete(`${x},${y}`);
+    }
+  }
+
+  return alcance;
 }
 
 /** O nome da forma como a mesa a chama — o rótulo da barra e o da lista. */

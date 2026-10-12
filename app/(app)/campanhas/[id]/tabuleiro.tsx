@@ -10,6 +10,7 @@ import {
   MasterBoardSheet,
   MasterTokenSidebar,
   nomeDaCelula,
+  type EscolhaDaArea,
   type ModoDoTabuleiro,
 } from '@/components/battlemap';
 import { CharacterSheetModal } from '@/components/character/CharacterSheetModal';
@@ -28,7 +29,7 @@ import { useStageItems } from '@/hooks/useStage';
 import { useCampaignChannel } from '@/realtime/useCampaignChannel';
 import { spacing, useResponsive, useTheme } from '@/theme';
 import { ApiError } from '@/api';
-import type { AreaEffectShape, CombatCondition, CombatEntry } from '@/api/types';
+import type { CombatCondition, CombatEntry } from '@/api/types';
 
 /**
  * O tabuleiro da mesa.
@@ -87,9 +88,11 @@ export default function TabuleiroScreen() {
 
   // Esfera de 6 m é a Bola de Fogo — a área que mais vai à mesa, e por isso o
   // ponto de partida. A barra troca forma e alcance sem abrir painel nenhum.
-  const [area, setArea] = useState<{ forma: AreaEffectShape; raio: number }>({
+  const [area, setArea] = useState<EscolhaDaArea>({
     forma: 'circle',
     raio: 4,
+    seguePeca: false,
+    duracao: null,
   });
 
   const mapa = tabuleiro.data;
@@ -258,17 +261,39 @@ export default function TabuleiroScreen() {
       // `length`; a esfera se mede do centro para fora, e leva `radius`.
       const medida = area.forma === 'circle' ? { radius: raio } : { length: raio, width: 1 };
 
+      // "Segue a peça" prende a área à peça sob o ponto de partida. A esfera
+      // passa a ter a peça como centro — é uma aura, medida da borda dela —, e
+      // as outras formas guardam a origem onde o gesto começou, que anda com
+      // a peça. Começada no chão vazio, a área sai solta, como sempre.
+      const peca = area.seguePeca
+        ? mapa?.tokens.find(
+            (t) =>
+              celula.x >= t.position.x &&
+              celula.x < t.position.x + t.size &&
+              celula.y >= t.position.y &&
+              celula.y < t.position.y + t.size
+          )
+        : undefined;
+
+      const origem = peca && area.forma === 'circle' ? peca.position : celula;
+
+      // Sem combate, a duração nem é oferecida; o cuidado aqui é para a área
+      // marcada no instante em que o mestre encerrou a luta em outra aba.
+      const duracao = area.duracao !== null && combate.data?.active ? { duration: area.duracao } : {};
+
       controles.adicionarArea.mutate({
         shape: area.forma,
-        x: celula.x,
-        y: celula.y,
+        x: origem.x,
+        y: origem.y,
         ...medida,
         ...(direcao === null ? {} : { direction: direcao }),
+        ...(peca ? { token_id: peca.id } : {}),
+        ...duracao,
         color: colors.danger,
         opacity: 0.3,
       });
     },
-    [controles.adicionarArea, colors.danger, area]
+    [controles.adicionarArea, colors.danger, area, mapa?.tokens, combate.data?.active]
   );
 
   /**
@@ -663,6 +688,7 @@ export default function TabuleiroScreen() {
           onRecentralizar={() => setPedidoDeCentralizar((n) => n + 1)}
           area={area}
           onArea={setArea}
+          combateAtivo={combateAtivo}
           onAbrirPainel={() => setPainelAberto(true)}
           onAbrirFicha={
             minhas.length > 0

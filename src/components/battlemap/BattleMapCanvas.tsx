@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -10,10 +10,11 @@ import Animated, {
 import { Image } from 'expo-image';
 import { Icon, Text } from '@/components/ui';
 import { useTheme } from '@/theme';
-import type { BattleMapState, BattleMapToken, FogRegion } from '@/api/types';
+import type { AreaEffect, BattleMapState, BattleMapToken, FogRegion } from '@/api/types';
 import { MapToken } from './MapToken';
 import { posicaoDaImagem } from './alinhamento';
 import {
+  celulasAoAlcance,
   celulasDaArea,
   celulasDaNevoa,
   corComOpacidade,
@@ -26,6 +27,7 @@ import {
   pontoNoPoligono,
   retanguloComoPoligono,
   type Celula,
+  type Pegada,
 } from './geometry';
 
 
@@ -197,6 +199,10 @@ export function BattleMapCanvas({
   // nele?" — e responder só depois de soltar chega tarde.
   const [passosDoArrasto, setPassosDoArrasto] = useState<number | null>(null);
 
+  // Qual peça o dedo está levando — o worklet sabe pelo `idArrastado`, mas o
+  // sombreado do alcance e a leitura "6 m de 9 m" são desenhados pelo React.
+  const [pecaEmMovimento, setPecaEmMovimento] = useState<number | null>(null);
+
   const janela = useRef({ largura: 0, altura: 0 });
 
   // Os callbacks vindos da tela mudam de identidade a cada render — as
@@ -207,11 +213,11 @@ export function BattleMapCanvas({
 
   // O que já está marcado no chão, para o gesto saber o que há sob o dedo sem
   // depender de props que mudam de identidade a cada render.
-  const cenario = useRef({ efeitos: battleMap.area_effects, colunas, linhas });
+  const cenario = useRef({ efeitos: battleMap.area_effects, tokens: battleMap.tokens, colunas, linhas });
 
   useEffect(() => {
     acoes.current = { onMarcarArea, onMoverToken, onRemoverArea };
-    cenario.current = { efeitos: battleMap.area_effects, colunas, linhas };
+    cenario.current = { efeitos: battleMap.area_effects, tokens: battleMap.tokens, colunas, linhas };
   });
 
   const podeMover = useCallback(
@@ -559,6 +565,8 @@ export function BattleMapCanvas({
           );
 
           idArrastado.value = sobODedo ? sobODedo.id : -1;
+
+          if (sobODedo) runOnJS(setPecaEmMovimento)(sobODedo.id);
         })
         .onUpdate((evento) => {
           if (idArrastado.value >= 0) {
@@ -596,6 +604,7 @@ export function BattleMapCanvas({
           arrastoX.value = 0;
           arrastoY.value = 0;
           runOnJS(setPassosDoArrasto)(null);
+          runOnJS(setPecaEmMovimento)(null);
         }),
     [
       deslocX, deslocY, deslocSalvoX, deslocSalvoY, escala, lado,
@@ -645,7 +654,7 @@ export function BattleMapCanvas({
       // escolhida na barra. Sem isto, um toque no modo Área não fazia nada, e
       // apagar uma área só era possível pelo painel do tabuleiro — longe do
       // dedo que acabou de marcá-la.
-      const { efeitos, colunas: largura, linhas: altura } = cenario.current;
+      const { efeitos, tokens, colunas: largura, linhas: altura } = cenario.current;
 
       // De trás para frente: com duas sobrepostas, sai a de cima, que é a que
       // a pessoa está vendo e apontando.
@@ -653,7 +662,7 @@ export function BattleMapCanvas({
         const efeito = efeitos[i];
         if (efeito === undefined) continue;
 
-        const pega = celulasDaArea(efeito, largura, altura).some(
+        const pega = celulasDaArea(efeito, largura, altura, pegadaDaArea(efeito, tokens)).some(
           (c) => c.x === atual.de.x && c.y === atual.de.y
         );
 
@@ -827,9 +836,36 @@ export function BattleMapCanvas({
     () =>
       battleMap.area_effects.map((efeito) => ({
         efeito,
-        celulas: celulasDaArea(efeito, colunas, linhas),
+        celulas: celulasDaArea(efeito, colunas, linhas, pegadaDaArea(efeito, battleMap.tokens)),
       })),
-    [battleMap.area_effects, colunas, linhas]
+    [battleMap.area_effects, battleMap.tokens, colunas, linhas]
+  );
+
+  /**
+   * A peça cujo alcance aparece no chão: a que o dedo leva ou, no modo Mover,
+   * a que está selecionada à espera do toque no destino. Só de quem pode
+   * movê-la — o alcance do dragão é conta do mestre, não do jogador.
+   */
+  const pecaDoAlcance = useMemo(() => {
+    const id = pecaEmMovimento ?? (modo === 'navegar' ? tokenSelecionado : null);
+    const peca = id === null ? undefined : battleMap.tokens.find((t) => t.id === id);
+
+    if (!peca || !podeMover(peca) || !peca.displacement) return null;
+
+    return peca;
+  }, [pecaEmMovimento, modo, tokenSelecionado, battleMap.tokens, podeMover]);
+
+  const alcance = useMemo(
+    () =>
+      pecaDoAlcance?.displacement
+        ? celulasAoAlcance(
+            { ...pecaDoAlcance.position, size: pecaDoAlcance.size },
+            pecaDoAlcance.displacement,
+            colunas,
+            linhas
+          )
+        : null,
+    [pecaDoAlcance, colunas, linhas]
   );
 
   if (!battleMap.id || grid === null) {
@@ -894,6 +930,9 @@ export function BattleMapCanvas({
 
             {areas.map(({ efeito, celulas }) => (
               <View key={efeito.id} pointerEvents="none">
+                {efeito.duration !== undefined && celulas[0] && (
+                  <EtiquetaDaDuracao rodadas={efeito.duration} celula={celulas[0]} lado={lado} />
+                )}
                 {celulas.map((celula) => (
                   <View
                     key={`${efeito.id}-${celula.x}-${celula.y}`}
@@ -977,6 +1016,10 @@ export function BattleMapCanvas({
               />
             )}
 
+            {alcance && (
+              <SombraDoAlcance alcance={alcance} lado={lado} cor={colors.accent} />
+            )}
+
             {/* As peças não recebem ponteiro: quem descobre quem está sob o
                 dedo é a conta do quadrado, no gesto único do tabuleiro. Com
                 elas capturando o toque, o gesto do tabuleiro nem começava
@@ -1012,7 +1055,20 @@ export function BattleMapCanvas({
             {regua
               ? formatarDistancia(distanciaEmMetros(regua.de, regua.para))
               : formatarDistancia((passosDoArrasto ?? 0) * METROS_POR_QUADRADO)}
+            {!regua && pecaDoAlcance?.displacement
+              ? ` de ${formatarDistancia(pecaDoAlcance.displacement)}`
+              : ''}
           </Text>
+
+          {/* O que o movimento custa, nas palavras do turno. Não trava nada:
+              o tabuleiro é posicional, e a investida, o terreno difícil e o
+              poder que empurra continuam sendo conta do mestre. */}
+          {!regua && pecaDoAlcance?.displacement && passosDoArrasto !== null && passosDoArrasto > 0 && (
+            <CustoDoMovimento
+              metros={passosDoArrasto * METROS_POR_QUADRADO}
+              deslocamento={pecaDoAlcance.displacement}
+            />
+          )}
 
           {/* De onde para onde, pelo nome dos quadrados: é assim que a mesa
               repete a medida em voz alta sem ter de apontar para a tela. */}
@@ -1051,6 +1107,115 @@ export function BattleMapCanvas({
         />
       </View>
     </View>
+  );
+}
+
+/** A peça em volta da qual a área é medida, se ela estiver presa a uma. */
+function pegadaDaArea(efeito: AreaEffect, tokens: BattleMapToken[]): Pegada | null {
+  if (efeito.token_id === undefined) return null;
+
+  const peca = tokens.find((t) => t.id === efeito.token_id);
+
+  return peca ? { ...peca.position, size: peca.size } : null;
+}
+
+/**
+ * Até onde a peça chega, pintado no chão.
+ *
+ * Duas faixas: a forte é uma ação de movimento; a fraca, duas — quando o
+ * jogador troca a ação padrão por mais movimento. Memoizado à parte porque
+ * são centenas de quadrados e o arrasto redesenha a tela a cada quadrado
+ * atravessado; com as mesmas props, o React nem visita esta camada.
+ */
+const SombraDoAlcance = memo(function SombraDoAlcance({
+  alcance,
+  lado,
+  cor,
+}: {
+  alcance: Map<string, 1 | 2>;
+  lado: number;
+  cor: string;
+}) {
+  const celulas = useMemo(
+    () =>
+      [...alcance].map(([chave, faixa]) => {
+        const [x = 0, y = 0] = chave.split(',').map(Number);
+
+        return { chave, x, y, faixa };
+      }),
+    [alcance]
+  );
+
+  return (
+    <View pointerEvents="none">
+      {celulas.map(({ chave, x, y, faixa }) => (
+        <View
+          key={`alcance-${chave}`}
+          style={{
+            position: 'absolute',
+            left: x * lado,
+            top: y * lado,
+            width: lado,
+            height: lado,
+            backgroundColor: cor,
+            opacity: faixa === 1 ? 0.28 : 0.12,
+          }}
+        />
+      ))}
+    </View>
+  );
+});
+
+/** "Uma ação de movimento", "duas", ou "além do deslocamento". */
+function CustoDoMovimento({ metros, deslocamento }: { metros: number; deslocamento: number }) {
+  const { colors } = useTheme();
+
+  const texto =
+    metros <= deslocamento
+      ? 'uma ação de movimento'
+      : metros <= deslocamento * 2
+        ? 'duas ações de movimento'
+        : 'além do deslocamento';
+
+  return (
+    <Text
+      variant="caption"
+      tone={metros > deslocamento * 2 ? undefined : 'muted'}
+      style={metros > deslocamento * 2 ? { color: colors.danger } : undefined}
+    >
+      {texto}
+    </Text>
+  );
+}
+
+/**
+ * Quantas rodadas a área ainda dura, no primeiro quadrado dela.
+ *
+ * Fica no mapa, e não só na lista do mestre, porque a pergunta é da mesa
+ * inteira: "a escuridão ainda está aí na minha vez?".
+ */
+function EtiquetaDaDuracao({ rodadas, celula, lado }: { rodadas: number; celula: Celula; lado: number }) {
+  const fonte = Math.max(8, Math.round(lado * 0.24));
+
+  return (
+    <Text
+      variant="caption"
+      numberOfLines={1}
+      style={{
+        position: 'absolute',
+        left: celula.x * lado + 2,
+        top: celula.y * lado + 2,
+        zIndex: 1,
+        fontSize: fonte,
+        lineHeight: Math.round(fonte * 1.25),
+        paddingHorizontal: 3,
+        borderRadius: 3,
+        color: '#fff',
+        backgroundColor: 'rgba(0,0,0,0.65)',
+      }}
+    >
+      {rodadas === 1 ? '1 rodada' : `${rodadas} rodadas`}
+    </Text>
   );
 }
 

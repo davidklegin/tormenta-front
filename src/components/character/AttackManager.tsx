@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { charactersApi } from '@/api';
-import type { CharacterAttack, ReferenceItem } from '@/api/types';
+import type { CharacterAttack, CharacterItem, ReferenceItem } from '@/api/types';
 import { Button, Card, Chip, Input, Select, Sheet, Text, Icon } from '@/components/ui';
 import { useReference } from '@/hooks/useReference';
 import { signed } from '@/rules';
@@ -19,10 +19,13 @@ import { radius, spacing, stroke, useTheme } from '@/theme';
 export function AttackManager({
   characterId,
   attacks,
+  inventory = [],
   editable,
 }: {
   characterId: number;
   attacks: CharacterAttack[];
+  /** Armas do inventário, para o ataque saber de qual delas sai (e somar os bônus dela). */
+  inventory?: CharacterItem[];
   editable: boolean;
 }) {
   const queryClient = useQueryClient();
@@ -124,6 +127,7 @@ export function AttackManager({
         characterId={characterId}
         attack={editing}
         weapons={weapons}
+        inventory={inventory.filter((item) => item.category === 'arma')}
         onSaved={invalidate}
       />
     </Card>
@@ -136,6 +140,7 @@ function AttackForm({
   characterId,
   attack,
   weapons,
+  inventory,
   onSaved,
 }: {
   visible: boolean;
@@ -143,9 +148,11 @@ function AttackForm({
   characterId: number;
   attack: CharacterAttack | null;
   weapons: ReferenceItem[];
+  inventory: CharacterItem[];
   onSaved: () => void;
 }) {
   const [name, setName] = useState(attack?.name ?? '');
+  const [ownedId, setOwnedId] = useState<number | null>(attack?.character_item_id ?? null);
   const [weaponId, setWeaponId] = useState<number | null>(attack?.item_id ?? null);
   const [attackType, setAttackType] = useState<string>(attack?.attack_type ?? 'corpo_a_corpo');
   const [damageDice, setDamageDice] = useState(attack?.computed.damage_breakdown[0]?.value ?? '');
@@ -161,6 +168,8 @@ function AttackForm({
       const payload = {
         name: name.trim(),
         item_id: weaponId ?? undefined,
+        // Nulo de propósito na edição: desvincular a arma é uma escolha.
+        character_item_id: ownedId,
         attack_type: attackType,
         damage_dice: damageDice.trim() || undefined,
         critical_range: Number.parseInt(criticalRange, 10) || 20,
@@ -193,8 +202,41 @@ function AttackForm({
         </>
       }
     >
+      {inventory.length > 0 ? (
+        <Select
+          label="Arma do inventário (opcional)"
+          value={ownedId}
+          options={inventory.map((owned) => ({
+            value: owned.id,
+            label: owned.name,
+            description: owned.effects.length ? 'com bônus' : undefined,
+          }))}
+          onChange={(value) => {
+            setOwnedId(value);
+            const owned = inventory.find((entry) => entry.id === value);
+            if (!owned) return;
+
+            setName(owned.name);
+            // Se a arma veio do livro ou da Forja, o dano e o crítico vêm dela.
+            const weapon = weapons.find((entry) => entry.id === owned.item_id);
+            if (weapon) {
+              setWeaponId(weapon.id);
+              setDamageDice(weapon.damage ?? '');
+              setCriticalRange(String(weapon.critical_range ?? 20));
+              setCriticalMultiplier(String(weapon.critical_multiplier ?? 2));
+              setDamageType(weapon.damage_type ?? 'corte');
+              setRangeCategory(weapon.range_category ?? 'nenhum');
+              setAttackType(weapon.attack_type ?? 'corpo_a_corpo');
+            }
+          }}
+          clearable
+          placeholder="Escolher arma que o personagem carrega"
+          hint="Os bônus “só com este item” da arma entram neste ataque."
+        />
+      ) : null}
+
       <Select
-        label="Arma do livro (opcional)"
+        label="Arma do livro ou da Forja (opcional)"
         value={weaponId}
         options={weapons.map((weapon) => ({
           value: weapon.id,

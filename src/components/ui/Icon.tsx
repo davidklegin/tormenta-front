@@ -14,6 +14,7 @@ const GLYPHS = {
   personagens: 'account-details-outline',
   campanhas: 'flag-variant-outline',
   perfil: 'account-circle-outline',
+  forja: 'anvil',
 
   // Abas da ficha
   resumo: 'sword-cross',

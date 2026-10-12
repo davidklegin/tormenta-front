@@ -20,9 +20,25 @@ type Props = {
   onRecentralizar: () => void;
   /** Abre a ficha de quem está jogando. Ausente para quem não tem ficha na mesa. */
   onAbrirFicha?: () => void;
-  /** Forma e alcance que o próximo toque no modo Área vai marcar. */
-  area: { forma: AreaEffectShape; raio: number };
-  onArea: (area: { forma: AreaEffectShape; raio: number }) => void;
+  /** Forma, alcance, peça e duração que o próximo toque no modo Área vai marcar. */
+  area: EscolhaDaArea;
+  onArea: (area: EscolhaDaArea) => void;
+  /** A duração só existe com combate: é o turno de quem marcou que a conta. */
+  combateAtivo?: boolean;
+};
+
+/**
+ * O que a próxima área vai ser.
+ *
+ * `seguePeca`: começada em cima de uma peça, a área fica presa a ela e anda
+ * junto — a aura do paladino, a nuvem que envolve o dragão. `duracao`: em
+ * rodadas, contadas no turno de quem age agora; null é "até eu apagar".
+ */
+export type EscolhaDaArea = {
+  forma: AreaEffectShape;
+  raio: number;
+  seguePeca: boolean;
+  duracao: number | null;
 };
 
 type Ferramenta = { modo: ModoDoTabuleiro; icone: IconName; rotulo: string };
@@ -49,6 +65,9 @@ const FORMAS: { valor: AreaEffectShape; rotulo: string }[] = [
 ];
 
 const ALCANCES = [2, 4, 6, 8];
+
+/** As durações que mais vão à mesa: a magia de 1 rodada, a de cena curta. */
+const DURACOES = [1, 2, 3, 5, 10];
 
 /** Os tamanhos do livro, na ordem em que a mesa os nomeia. */
 const TAMANHOS = [
@@ -86,6 +105,7 @@ export function BattleMapToolbar({
   onAbrirFicha,
   area,
   onArea,
+  combateAtivo = false,
 }: Props) {
   const { colors } = useTheme();
   const ferramentas = ehMestre ? [...DE_TODOS, ...DO_MESTRE] : DE_TODOS;
@@ -127,7 +147,48 @@ export function BattleMapToolbar({
                 onPress={() => onArea({ ...area, raio: quadrados })}
               />
             ))}
+
+            <View style={[styles.separador, { backgroundColor: colors.border }]} />
+
+            <Acao
+              icone="jogadores"
+              rotulo="Segue a peça"
+              ativa={area.seguePeca}
+              onPress={() => onArea({ ...area, seguePeca: !area.seguePeca })}
+            />
           </View>
+
+          {/* A duração só aparece com combate: sem a fila de iniciativa não há
+              turno de ninguém para contar, e o servidor recusaria a área. */}
+          {combateAtivo && (
+            <View style={styles.trilho}>
+              <Text variant="caption" tone="muted">
+                Dura
+              </Text>
+              <Acao
+                rotulo="Até apagar"
+                ativa={area.duracao === null}
+                onPress={() => onArea({ ...area, duracao: null })}
+              />
+              {DURACOES.map((rodadas) => (
+                <Acao
+                  key={rodadas}
+                  rotulo={rodadas === 1 ? '1 rodada' : `${rodadas} rodadas`}
+                  ativa={area.duracao === rodadas}
+                  onPress={() => onArea({ ...area, duracao: rodadas })}
+                />
+              ))}
+            </View>
+          )}
+
+          <Text variant="caption" tone="muted" style={styles.dicaDaArea}>
+            {area.seguePeca
+              ? 'Comece em cima de uma peça: a área anda com ela.'
+              : 'Toque para marcar; arraste para dar direção.'}
+            {combateAtivo && area.duracao !== null
+              ? ' A contagem anda no turno de quem age agora.'
+              : ''}
+          </Text>
         </View>
       )}
       {tokenSelecionado && (
@@ -298,6 +359,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.xs,
+  },
+  dicaDaArea: {
+    paddingTop: spacing.xxs,
   },
   separador: {
     width: StyleSheet.hairlineWidth,

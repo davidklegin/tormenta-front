@@ -161,6 +161,8 @@ export type CharacterAttribute = {
   racial: number;
   bonus: number;
   temp: number;
+  /** O que os itens equipados somam (o cinto de Força +1). */
+  items?: number;
   total: number;
 };
 
@@ -187,6 +189,8 @@ export type CharacterAttack = {
   id: number;
   name: string;
   item_id: number | null;
+  /** A arma do inventário de onde sai o golpe — e cujos bônus "só com este item" valem aqui. */
+  character_item_id: number | null;
   attack_type: 'corpo_a_corpo' | 'arremesso' | 'disparo';
   attack_type_label: string;
   skill_key: string;
@@ -225,6 +229,70 @@ export type CharacterItem = {
   defense_bonus: number | null;
   armor_penalty: number | null;
   armor_weight: string | null;
+  /** Bônus do item; somam na ficha só enquanto ele está equipado. */
+  effects: ItemEffect[];
+};
+
+/** O que um bônus de item soma na ficha. */
+export type ItemEffectTarget =
+  | 'attribute'
+  | 'skill'
+  | 'defense'
+  | 'hp'
+  | 'mp'
+  | 'displacement'
+  | 'damage_reduction'
+  | 'attack'
+  | 'damage'
+  | 'spell_damage'
+  | 'spell_dc'
+  | 'note';
+
+/** Ataque e dano: todos os ataques, corpo a corpo, à distância ou só os deste item. */
+export type ItemEffectScope = 'all' | 'melee' | 'ranged' | 'this';
+
+/**
+ * Um bônus de item, no formato que a Forja e o inventário gravam.
+ *
+ * `dice` só no dano ("+1d6 de fogo"); `keys` diz qual atributo ou perícia;
+ * `types` limita a RD a alguns tipos de dano; `text` é o efeito que não é
+ * número ("respira debaixo d'água").
+ */
+export type ItemEffect = {
+  target: ItemEffectTarget;
+  value?: number;
+  dice?: string;
+  keys?: string[];
+  scope?: ItemEffectScope;
+  types?: string[];
+  damage_type?: string;
+  text?: string;
+};
+
+/** Item criado na Forja. */
+export type ForgeItem = {
+  id: number;
+  key: string;
+  name: string;
+  category: CharacterItem['category'];
+  category_label: string;
+  description: string | null;
+  price: number | null;
+  slots: number;
+  damage: string | null;
+  damage_type: string | null;
+  critical_range: number | null;
+  critical_multiplier: number | null;
+  attack_type: string | null;
+  range_category: string | null;
+  defense_bonus: number | null;
+  armor_penalty: number | null;
+  armor_weight: string | null;
+  effects: ItemEffect[];
+  creator: { id: number; name: string } | null;
+  /** Só o autor e o MASTER mexem no item. */
+  can_edit: boolean;
+  updated_at: string | null;
 };
 
 export type CharacterPower = {
@@ -601,9 +669,30 @@ export type Character = {
   proficiencies: string | null;
   spellcasting: {
     total: number | null;
+    calculated: number | null;
     attribute: AttributeKey | null;
     overridden: boolean;
     breakdown: { label: string; value: number }[];
+  };
+  /**
+   * A CD do indicador ao lado da Defesa: a de magia para quem conjura (com o
+   * que os itens equipados somam), a do atributo-chave para os demais.
+   */
+  ability_dc: {
+    total: number | null;
+    calculated: number | null;
+    attribute: AttributeKey | null;
+    overridden: boolean;
+    breakdown: { label: string; value: number }[];
+    source: 'spell' | 'key_attribute' | null;
+  };
+  /** O que os itens equipados somam no dano das magias. */
+  spell_damage: {
+    value: number;
+    dice: string[];
+    /** "+1d6+2", ou null quando nenhum item soma nada. */
+    label: string | null;
+    breakdown: { label: string; value: number; dice: string | null }[];
   };
   skills: CharacterSkill[];
   attacks: CharacterAttack[];
@@ -631,6 +720,58 @@ export type Character = {
   };
   created_at: string | null;
   updated_at: string | null;
+};
+
+// -------------------------------------------------- subir de nível
+
+/** Antes e depois de um número que o nível novo mexe. */
+export type LevelUpChange<T> = { before: T; after: T };
+
+/**
+ * O que um nível novo numa classe traz — calculado no servidor com a mesma
+ * conta da ficha (LevelUpService), para a prévia não prometer o que a ficha
+ * não entrega.
+ */
+export type LevelUpPreview = {
+  class: {
+    id: number;
+    key: string;
+    name: string;
+    level_before: number;
+    level_after: number;
+    /** Multiclasse: o 1º nível nesta classe. */
+    is_new: boolean;
+    book_page: number | null;
+  };
+  level: LevelUpChange<number>;
+  hp: LevelUpChange<number> & { gain: number; overridden: boolean };
+  mp: LevelUpChange<number> & { gain: number; overridden: boolean };
+  half_level: LevelUpChange<number>;
+  training_bonus: LevelUpChange<number>;
+  tier: LevelUpChange<string>;
+  /** Este nível traz um poder da classe (ou um poder geral no lugar). */
+  power_slot: boolean;
+  spells: {
+    tradition: SpellTradition;
+    max_circle: number;
+    /** O círculo que abre neste nível, se abrir. */
+    new_circle: number | null;
+    /** Quantas magias o nível ensina. */
+    learns: number;
+    /** São as magias iniciais da classe (1º nível nela). */
+    initial: boolean;
+    /** Bardo e druida: só das três escolas escolhidas. */
+    limited_schools: boolean;
+  } | null;
+  experience: { current: number; required: number };
+};
+
+export type LevelUpResult = {
+  level: number;
+  class_label: string;
+  hp: { current: number; max: number };
+  mp: { current: number; max: number };
+  version: number;
 };
 
 // -------------------------------------------------- painel do mestre
@@ -852,6 +993,11 @@ export type ReferenceItem = {
   armor_weight: string | null;
   defense_bonus: number | null;
   armor_penalty: number | null;
+  /** Bônus que o item da Forja copia para a ficha. */
+  effects: ItemEffect[];
+  /** Criado na Forja, e não do livro. */
+  is_homebrew: boolean;
+  creator_name: string | null;
 };
 
 export type ReferenceData = {
@@ -1162,6 +1308,13 @@ export type BattleMapToken = {
   image_url: string | null;
   conditions: string[];
   visible: boolean;
+  /**
+   * Metros andados com uma ação de movimento — o que a leitura do arrasto
+   * compara ("6 m de 9 m"). Da ficha, para personagem; do bloco de números
+   * do acervo, para criatura, e só na visão do mestre. Null quando não há de
+   * onde tirar.
+   */
+  displacement: number | null;
 };
 
 export type AreaEffectShape = 'circle' | 'cone' | 'line' | 'cube';
@@ -1178,6 +1331,13 @@ export type AreaEffect = {
   color?: string;
   opacity?: number;
   label?: string;
+  /** Presa a esta peça: anda com ela, e some quando ela sai do mapa. */
+  token_id?: number;
+  /** Rodadas que faltam. Ausente: a área fica até o mestre apagá-la. */
+  duration?: number;
+  /** Quem age quando a área perde uma rodada — quem a marcou. Do servidor. */
+  applied_by_entry_id?: string;
+  applied_by_name?: string | null;
 };
 
 export type FogRegion = {

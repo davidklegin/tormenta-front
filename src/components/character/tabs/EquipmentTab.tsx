@@ -19,7 +19,13 @@ import {
 import { TreasuryCard } from '@/components/campaign/TreasuryCard';
 import { ShowcaseButton } from '@/components/showcase';
 import { useReference } from '@/hooks/useReference';
-import { describeCatalogItem, formatSlots, formatTibar } from '@/rules';
+import { describeCatalogItem, describeItemEffect, effectKeyNames, formatSlots, formatTibar } from '@/rules';
+import {
+  ItemEffectsEditor,
+  draftsToEffects,
+  effectsToDrafts,
+  type EffectDraft,
+} from '@/components/items/ItemEffectsEditor';
 import { radius, spacing, useTheme } from '@/theme';
 
 /**
@@ -36,6 +42,7 @@ export function EquipmentContent({ characterId, character }: { characterId: numb
   const queryClient = useQueryClient();
   const reference = useReference();
   const canEdit = character.permissions.can_update;
+  const names = effectKeyNames(reference.data);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<CharacterItem | null>(null);
@@ -215,6 +222,14 @@ export function EquipmentContent({ characterId, character }: { characterId: numb
                     {item.defense_bonus ? ` · Defesa +${item.defense_bonus}` : ''}
                     {item.armor_penalty ? ` · armadura ${item.armor_penalty}` : ''}
                   </Text>
+                  {/* Os bônus aparecem apagados na mochila: estão ali, mas não
+                      somam enquanto o item não for equipado. */}
+                  {item.effects.length > 0 ? (
+                    <Text variant="caption" tone={item.equipped ? 'gold' : 'muted'} numberOfLines={2}>
+                      {item.effects.map((effect) => describeItemEffect(effect, names)).join(' · ')}
+                      {item.equipped ? '' : ' (equipe para valer)'}
+                    </Text>
+                  ) : null}
                 </Pressable>
 
                 {canEdit ? (
@@ -260,6 +275,19 @@ export function EquipmentContent({ characterId, character }: { characterId: numb
               />
               <DetailRow label="Peso da armadura" value={detail.armor_weight} />
             </View>
+
+            {detail.effects.length > 0 ? (
+              <View style={{ gap: spacing.xs }}>
+                <Text variant="caption" tone="secondary" uppercase>
+                  {detail.equipped ? 'Somando na ficha' : 'Bônus (só valem com o item equipado)'}
+                </Text>
+                {detail.effects.map((effect, index) => (
+                  <Text key={index} variant="body" tone={detail.equipped ? 'gold' : 'muted'}>
+                    {describeItemEffect(effect, names)}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
 
             <Text variant="body" tone="secondary">
               {detail.description || 'Sem descrição.'}
@@ -369,6 +397,9 @@ function ItemForm({
   const [slots, setSlots] = useState(String(item?.slots ?? 1));
   const [catalogId, setCatalogId] = useState<number | null>(item?.item_id ?? null);
   const [description, setDescription] = useState(item?.description ?? '');
+  const [drafts, setDrafts] = useState<EffectDraft[]>(effectsToDrafts(item?.effects));
+  const catalogEntry = catalog.find((entry) => entry.id === catalogId);
+  const isWeapon = (item?.category ?? catalogEntry?.category) === 'arma';
 
   const save = useMutation({
     mutationFn: () => {
@@ -378,6 +409,7 @@ function ItemForm({
         slots: Number.parseFloat(slots.replace(',', '.')) || 1,
         description: description.trim() || undefined,
         item_id: catalogId ?? undefined,
+        effects: draftsToEffects(drafts),
       };
 
       return item
@@ -413,12 +445,14 @@ function ItemForm({
       ) : null}
 
       <Select
-        label="Do livro (opcional)"
+        label="Do livro ou da Forja (opcional)"
         value={catalogId}
         options={catalog.map((entry) => ({
           value: entry.id,
           label: entry.name,
-          description: describeCatalogItem(entry),
+          description: entry.is_homebrew
+            ? ['Forja', entry.creator_name, describeCatalogItem(entry)].filter(Boolean).join(' · ')
+            : describeCatalogItem(entry),
         }))}
         onChange={(value) => {
           setCatalogId(value);
@@ -430,10 +464,13 @@ function ItemForm({
             // vier junto. O que o jogador já escreveu à mão manda: um item
             // adaptado na mesa não é sobrescrito pela troca de catálogo.
             if (!description.trim() && found.description) setDescription(found.description);
+            // Os bônus do item da Forja vêm junto, com a mesma regra: o que o
+            // jogador já montou à mão não é trocado.
+            if (drafts.length === 0 && found.effects?.length) setDrafts(effectsToDrafts(found.effects));
           }
         }}
         clearable
-        placeholder="Escolher do catálogo do livro"
+        placeholder="Escolher do livro ou da Forja"
       />
 
       <Input label="Nome" value={name} onChangeText={setName} />
@@ -457,6 +494,22 @@ function ItemForm({
       </View>
 
       <Input label="Descrição" value={description} onChangeText={setDescription} multiline />
+
+      <View style={{ gap: spacing.sm }}>
+        <Text variant="caption" tone="secondary" uppercase>
+          O que o item dá
+        </Text>
+        <Text variant="caption" tone="muted">
+          Os bônus somam na ficha enquanto o item estiver equipado. Para criar um item que outras fichas também
+          possam usar, use a aba Forja.
+        </Text>
+        <ItemEffectsEditor
+          drafts={drafts}
+          onChange={setDrafts}
+          defaultScope={isWeapon ? 'this' : 'all'}
+          errors={save.error instanceof ApiError ? save.error.errors : undefined}
+        />
+      </View>
     </Sheet>
   );
 }

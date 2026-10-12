@@ -19,7 +19,7 @@ import {
 import { SpellCatalogSheet } from '../SpellCatalogSheet';
 import { ShowcaseButton } from '@/components/showcase';
 import { useReference } from '@/hooks/useReference';
-import { SPELL_CIRCLE_COST } from '@/rules';
+import { SPELL_CIRCLE_COST, signed } from '@/rules';
 import { radius, spacing, useTheme } from '@/theme';
 import { contemTermo, normalizar } from '@/utils/texto';
 
@@ -108,6 +108,33 @@ export function SpellsContent({ characterId, character }: { characterId: number;
             </View>
             <Text variant="numeric" tone="arcane">
               {character.spellcasting.total}
+            </Text>
+          </View>
+        </Card>
+      ) : null}
+
+      {/* Dano extra dos itens equipados (cajado, anel…). A ficha não rola o
+          dano de cada magia, então diz quanto somar a ele. */}
+      {character.spell_damage?.label ? (
+        <Card>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: spacing.md }}>
+            <View style={{ flex: 1 }}>
+              <Text variant="caption" tone="secondary" uppercase>
+                Dano extra nas magias
+              </Text>
+              <Text variant="caption" tone="muted">
+                {character.spell_damage.breakdown
+                  .map((part) => {
+                    const quanto = [part.dice ? `+${part.dice}` : '', part.value ? signed(part.value) : '']
+                      .filter(Boolean)
+                      .join('');
+                    return `${part.label} ${quanto}`;
+                  })
+                  .join(' · ')}
+              </Text>
+            </View>
+            <Text variant="numeric" tone="arcane">
+              {character.spell_damage.label}
             </Text>
           </View>
         </Card>

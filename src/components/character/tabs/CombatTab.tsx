@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { charactersApi } from '@/api';
 import type { Character } from '@/api/types';
 import { Button, Card, Divider, HelpNote, Icon, Text } from '@/components/ui';
+import { rotuloDaCd } from '../CharacterHeader';
 import { AttackManager } from '../AttackManager';
 import { ConditionManager } from '../ConditionManager';
 import { ResourceManager } from '../ResourceManager';
@@ -112,6 +113,7 @@ export function CombatContent({ characterId, character }: { characterId: number;
       <AttackManager
         characterId={characterId}
         attacks={character.attacks}
+        inventory={character.items}
         editable={character.permissions.can_update}
       />
 
@@ -146,6 +148,52 @@ export function CombatContent({ characterId, character }: { characterId: number;
                 : `o atributo escolhido na ficha, ${ATTRIBUTE_LABELS[character.defense.attribute].full},`
             } mais o que armadura e escudo derem.`}
           </HelpNote>
+
+          {/* A CD fica no mesmo card que a Defesa e aparece ao lado dela no
+              cabeçalho: um número para acertar o personagem, outro para
+              resistir ao que ele faz. A conta aberta mostra os itens. */}
+          {character.ability_dc.total !== null ? (
+            <>
+              <Divider />
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                <Text variant="bodyStrong" style={{ flex: 1 }}>
+                  {rotuloDaCd(character)}
+                </Text>
+                <Text variant="numeric" tone="primary">
+                  {character.ability_dc.total}
+                </Text>
+              </View>
+
+              <View style={{ gap: spacing.xs }}>
+                {character.ability_dc.breakdown.map((parte, index) => (
+                  <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text variant="small" tone="secondary">
+                      {parte.label}
+                    </Text>
+                    <Text variant="smallStrong">{signed(parte.value)}</Text>
+                  </View>
+                ))}
+                {character.ability_dc.overridden ? (
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text variant="small" tone="secondary">
+                      Valor fixado na ficha (a conta daria {character.ability_dc.calculated})
+                    </Text>
+                    <Text variant="smallStrong">{character.ability_dc.total}</Text>
+                  </View>
+                ) : null}
+              </View>
+
+              <HelpNote
+                collapsible
+                source={character.ability_dc.source === 'spell' ? 'Livro base, p. 170' : undefined}
+              >
+                {character.ability_dc.source === 'spell'
+                  ? 'A CD é o número que o alvo precisa alcançar no teste de resistência para escapar das suas magias: 10 + metade do nível + o atributo de conjuração, mais o que os itens equipados somam — uma varinha arcana só conta enquanto estiver marcada como equipada.'
+                  : 'A CD é o número que o alvo precisa alcançar no teste de resistência para escapar das suas habilidades: 10 + metade do nível + o atributo que a habilidade cita. Aqui está a conta com o seu atributo-chave; se a habilidade citar outro atributo, troque esse número pelo dele.'}
+              </HelpNote>
+            </>
+          ) : null}
 
           {/* RD fica no mesmo card: Defesa é acertar, RD é o quanto dói. */}
           {character.damage_reduction.total > 0 || character.damage_reduction.typed.length > 0 ? (
@@ -183,10 +231,7 @@ export function CombatContent({ characterId, character }: { characterId: number;
                   fora do número grande porque ele sai de todo golpe, e estas
                   só do golpe do tipo certo. */}
               {character.damage_reduction.typed.map((parte, index) => (
-                <View
-                  key={index}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}
-                >
+                <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                   <View style={{ flex: 1 }}>
                     <Text variant="bodyStrong">Redução de {listarTipos(parte.types)}</Text>
                     <Text variant="small" tone="secondary">
